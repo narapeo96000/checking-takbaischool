@@ -1,7 +1,7 @@
 import {Views} from './views.js';
 import {renderUserGuide} from './manual.js?v=reference-theme-20261001';
 import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=reference-theme-20261001';
-import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl,loadSweetAlert,loadXlsx} from './core.js';
+import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl} from './core.js';
 
 export class AttendanceApp {
   constructor(){
@@ -146,7 +146,7 @@ export class AttendanceApp {
   }
 
   async importStudents(){
-    try{await loadXlsx();}catch(error){this.toast(error.message,'error');return;}
+    if(!window.XLSX){this.toast('ไม่พบตัวอ่านไฟล์ XLS กรุณาโหลดหน้าเว็บใหม่','error');return;}
     const input=document.createElement('input');input.type='file';input.accept='.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     const file=await new Promise(resolve=>{input.onchange=()=>resolve(input.files?.[0]||null);input.click();});if(!file)return;
     this.toast('กำลังตรวจสอบไฟล์…','info');
@@ -164,7 +164,7 @@ export class AttendanceApp {
   async showLogs(){const records=await this.call('getLogs',{dateFrom:this.state.filters.dateFrom||today(),dateTo:this.state.filters.dateTo||today(),limit:100});const rows=(Array.isArray(records)?records:records.logs||[]).map(row=>({...row,location:row.location?.location?{...row.location.location,locationError:row.location.locationError}:row.location}));await this.modal({title:'ประวัติการใช้งานย้อนหลัง',html:`<p>ช่วง ${e(this.state.filters.dateFrom||today())} ถึง ${e(this.state.filters.dateTo||today())} · ล่าสุดไม่เกิน 100 รายการ</p><div class="table-wrap"><table class="data-table"><thead><tr><th>เวลา</th><th>ผู้ใช้งาน</th><th>การทำรายการ</th><th>พิกัด / ความแม่นยำ</th><th>รายละเอียด</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${e(r.timestamp||r.createdAt||r.updatedAt)}</td><td>${e(r.actorName||r.actorId)}</td><td>${e(r.action)}</td><td>${r.location?.latitude!=null?`${e(r.location.latitude)}, ${e(r.location.longitude)}<small>± ${e(r.location.accuracy)} เมตร</small>`:e(r.location?.locationError||'ไม่มีพิกัด')}</td><td>${e(r.detail||r.entityId||'')}<details><summary>ก่อน / หลังแก้ไข</summary><pre>${e(JSON.stringify({before:r.before,after:r.after},null,2))}</pre></details></td></tr>`).join('')||'<tr><td colspan="5">ไม่มีประวัติในช่วงวันที่นี้</td></tr>'}</tbody></table></div>`,width:1100,showCancelButton:false,confirmButtonText:'ปิด'});}
   async exportPdf(){if(this.queue?.items.length){await this.sync();if(this.queue.items.length)throw new Error('ซิงก์ข้อมูลที่ค้างก่อนออกรายงาน PDF');}if(this.state.demo){const result=await this.modal({title:'รายงานข้อมูลตัวอย่าง',text:'ใช้หน้าต่างพิมพ์แล้วเลือกบันทึกเป็น PDF หรือเชื่อมต่อหลังบ้านเพื่อสร้างรายงานจริง',confirmButtonText:'พิมพ์ / บันทึก PDF'});if(result.isConfirmed)window.print();return;}this.toast('กำลังสร้างรายงาน PDF…');const filters=this.state.route==='statistics'?this.state.filters:{date:this.state.filters.date||today()};const data=await this.call('exportPdf',filters);const base64=data.base64||data.content;if(!base64)throw new Error('เซิร์ฟเวอร์ไม่ได้ส่งไฟล์ PDF');const bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));const link=document.createElement('a');link.href=url;link.download=data.filename||`รายงานการมาเรียน-${today()}.pdf`;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);this.toast('สร้างรายงาน PDF แล้ว');}
   printGuide(){const details=[...document.querySelectorAll('.guide-content details')];const opened=details.map(node=>node.open);details.forEach(node=>node.open=true);window.addEventListener('afterprint',()=>details.forEach((node,index)=>node.open=opened[index]),{once:true});window.print();}
-  async modal(options){if(!window.Swal){try{await loadSweetAlert();}catch{}}if(window.Swal)return Swal.fire({confirmButtonText:'ยืนยัน',cancelButtonText:'ยกเลิก',showCancelButton:true,confirmButtonColor:this.state.settings.secondaryColor,...options});if(options.input){const value=window.prompt(`${options.title}\n${options.inputLabel||''}`,options.inputValue||'');return {isConfirmed:value!==null,value};}return {isConfirmed:window.confirm(`${options.title}\n${options.text||''}`)};}
+  async modal(options){if(window.Swal)return Swal.fire({confirmButtonText:'ยืนยัน',cancelButtonText:'ยกเลิก',showCancelButton:true,confirmButtonColor:this.state.settings.secondaryColor,...options});if(options.input){const value=window.prompt(`${options.title}\n${options.inputLabel||''}`,options.inputValue||'');return {isConfirmed:value!==null,value};}return {isConfirmed:window.confirm(`${options.title}\n${options.text||''}`)};}
   async formModal(title,fields,values={},cancel=true){const html=`<form id="modal-form" class="modal-form">${fields.map(field=>`<label class="field"><span>${e(field.label)}</span>${field.options?`<select name="${e(field.name)}" ${field.required?'required':''}>${field.options.map(option=>`<option value="${e(option.value)}" ${String(values[field.name]??'')===String(option.value)?'selected':''}>${e(option.label)}</option>`).join('')}</select>`:`<input name="${e(field.name)}" type="${field.type||'text'}" value="${e(values[field.name]||'')}" ${field.required?'required':''} ${field.readonly?'readonly':''} ${field.minlength?`minlength="${field.minlength}"`:''} ${field.min?`min="${field.min}"`:''} autocomplete="${field.type==='password'?'new-password':'off'}">`}</label>`).join('')}</form>`;
     const result=await this.modal({title,html,showCancelButton:cancel,allowOutsideClick:cancel,allowEscapeKey:cancel,preConfirm:()=>{const form=document.getElementById('modal-form');if(!form.reportValidity())return false;return Object.fromEntries(new FormData(form));}});return result.isConfirmed?result.value:null;}
   toast(message,type='success'){
@@ -181,7 +181,6 @@ export class AttendanceApp {
       });
       return;
     }
-    loadSweetAlert().then(()=>this.toast(message,type)).catch(()=>{});
     const el=document.getElementById('toast');el.textContent=message;el.className=`toast visible ${type}`;clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.remove('visible'),6000);
   }
   async error(error){this.toast(error.message||'เกิดข้อผิดพลาด','error');if(['UNAUTHORIZED','SESSION_EXPIRED','AUTH_REQUIRED'].includes(error.code)){if(this.api)this.api.token='';this.state.user=null;this.state.route='login';this.render();}}

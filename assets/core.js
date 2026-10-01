@@ -1,20 +1,4 @@
 export const STATUSES = Object.freeze({present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'});
-let sweetAlertPromise;
-let xlsxPromise;
-const loadExternalScript = (url, globalName) => {
-  if (window[globalName]) return Promise.resolve(window[globalName]);
-  const existing = document.querySelector(`script[data-library="${globalName}"]`);
-  if (existing) return new Promise((resolve, reject) => { existing.addEventListener('load', () => resolve(window[globalName]), {once:true}); existing.addEventListener('error', () => reject(new Error(`โหลด ${globalName} ไม่สำเร็จ`)), {once:true}); });
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = url; script.async = true; script.dataset.library = globalName;
-    script.onload = () => window[globalName] ? resolve(window[globalName]) : reject(new Error(`โหลด ${globalName} ไม่สำเร็จ`));
-    script.onerror = () => reject(new Error(`โหลด ${globalName} ไม่สำเร็จ`));
-    document.head.appendChild(script);
-  });
-};
-export const loadSweetAlert = () => sweetAlertPromise ||= loadExternalScript('https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js','Swal');
-export const loadXlsx = () => xlsxPromise ||= loadExternalScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js','XLSX');
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 export const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export const uuid = () => crypto.randomUUID();
