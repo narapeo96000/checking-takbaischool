@@ -67,7 +67,7 @@ export const Views = {
     const date = state.dashboard?.date || state.filters?.dashboard?.date || state.filters?.date || today();
     const roomData = list(state.classrooms).map(room => ({ ...room, ...(rooms.find(item => String(item.classroomId || item.id) === String(room.id)) || {}) }));
     const complete = roomData.filter(room => Number(room.unmarked) === 0 && Number(room.total) > 0).length;
-    return `${pageHead('ภาพรวมการมาเรียน', `สวัสดี ${state.user.displayName || state.user.name || state.user.username || 'คุณครู'}`, 'ติดตามการมาเรียนของนักเรียน และความคืบหน้าการเช็คชื่อในวันนี้', `<label class="date-control">${icon('calendar')}<input type="date" id="dashboard-date" aria-label="วันที่ของรายงาน" value="${h(date)}"></label>${button('ส่งออก PDF', 'export-pdf', 'download')}`)}
+    return `${pageHead('ภาพรวมการมาเรียน', `สวัสดี ${state.user.displayName || state.user.name || state.user.username || 'คุณครู'}`, 'ติดตามการมาเรียนของนักเรียน และความคืบหน้าการเช็คชื่อในวันนี้', `<label class="date-control">${icon('calendar')}<input type="date" id="dashboard-date" aria-label="วันที่ของรายงาน" value="${h(date)}"></label>${button('รายงานละเอียด', 'open-statistics', 'chart', 'secondary')}${button('ส่งออก PDF', 'export-pdf', 'download')}`)}
       ${connectionNotice(state)}
       <div class="overview-banner"><div><span class="overview-label">รายงานประจำวัน</span><h2>${displayDate(date)}</h2><p>${h(state.settings?.schoolName || 'ระบบเช็คชื่อโรงเรียน')} <span class="overview-dot">•</span> อัปเดตจากข้อมูลการเช็คชื่อ</p></div><div class="overview-rate"><span>อัตราการมาเรียน</span><strong>${number(Number(summary.rate).toFixed(1))}<small>%</small></strong><span>นับรวมผู้มาเรียนและมาสาย</span></div></div>
       ${statCards(summary)}
