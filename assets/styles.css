@@ -63,3 +63,6 @@
 /* Centered SweetAlert status popup */
 .swal-status-popup{border-top:5px solid var(--primary)!important;min-width:320px!important;padding:28px 25px!important}.swal-status-popup .swal2-icon{margin:0 auto 15px!important}.swal-status-popup .swal2-title{margin:0!important}
 .login-options{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:2px 0 16px}.check-option{display:flex;align-items:center;gap:8px;color:#64748b;font-size:11px;cursor:pointer}.check-option input{width:17px;height:17px;accent-color:var(--primary);cursor:pointer}.check-option span{line-height:1.6}
+
+/* Clear status colors for attendance actions */
+.status-button-present{color:#1c7955;background:#f0fbf5;border-color:#9bd7bb}.status-button-absent{color:#ae5140;background:#fff4f2;border-color:#e7aaa0}.status-button-late{color:#846313;background:#fff9e8;border-color:#e8cf83}.status-button-leave{color:#39758c;background:#f0f8fb;border-color:#a6cfdb}.status-button-present:hover,.status-button-absent:hover,.status-button-late:hover,.status-button-leave:hover{filter:brightness(.97)}
