@@ -21,6 +21,10 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
+      - name: Verify source and attendance rules
+        run: |
+          node scripts/check.mjs
+          npm test
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Stage public frontend only
