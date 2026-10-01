@@ -63,6 +63,7 @@ export class AttendanceApp {
       case 'refresh-location':await this.captureLocation();break;
       case 'export-pdf':await this.exportPdf();break;
       case 'add-student':await this.editStudent();break;
+      case 'download-student-template':this.downloadStudentTemplate();break;
       case 'import-students':await this.importStudents();break;
       case 'edit-student':await this.editStudent(button.dataset.id);break;
       case 'manage-classrooms':await this.manageClassrooms();break;
@@ -136,6 +137,14 @@ export class AttendanceApp {
   async changePassword(required=false){const result=await this.formModal(required?'ตั้งรหัสผ่านใหม่ก่อนใช้งาน':'เปลี่ยนรหัสผ่าน',[{name:'currentPassword',label:'รหัสผ่านปัจจุบัน',type:'password',required:true},{name:'newPassword',label:'รหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร)',type:'password',required:true,minlength:12},{name:'confirmPassword',label:'ยืนยันรหัสผ่านใหม่',type:'password',required:true}],{},!required);if(!result){if(required){await this.logout();throw new Error('ต้องตั้งรหัสผ่านใหม่ก่อนใช้งาน');}return;}if(result.newPassword!==result.confirmPassword)throw new Error('รหัสผ่านใหม่ไม่ตรงกัน');await this.call('changePassword',result);this.state.user.mustChangePassword=false;this.toast('เปลี่ยนรหัสผ่านแล้ว');}
   async forgotPassword(){const request=await this.formModal('ขอรีเซ็ตรหัสผ่าน',[{name:'username',label:'ชื่อผู้ใช้งาน',required:true},{name:'email',label:'อีเมลที่ลงทะเบียนไว้',type:'email',required:true}],{},true);if(!request)return;await this.call('requestPasswordReset',request);const notice=await this.modal({title:'ตรวจอีเมลของคุณ',text:'ถ้าชื่อผู้ใช้และอีเมลตรงกัน ระบบจะส่งรหัสรีเซ็ตไปยังอีเมลที่ลงทะเบียน รหัสใช้ได้ 15 นาที',icon:'info',confirmButtonText:'กรอกรหัสรีเซ็ต'});if(!notice.isConfirmed)return;const reset=await this.formModal('ตั้งรหัสผ่านใหม่',[{name:'token',label:'รหัสรีเซ็ตจากอีเมล',required:true},{name:'newPassword',label:'รหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร)',type:'password',required:true,minlength:12},{name:'confirmPassword',label:'ยืนยันรหัสผ่านใหม่',type:'password',required:true}],{},true);if(!reset)return;if(reset.newPassword!==reset.confirmPassword)throw new Error('รหัสผ่านใหม่ไม่ตรงกัน');await this.call('resetPassword',reset);this.toast('รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบ');}
   async editStudent(id){const s=this.state.students.find(x=>x.id===id)||{};const result=await this.formModal(id?'แก้ไขนักเรียน':'เพิ่มนักเรียน',[{name:'studentId',label:'เลขประจำตัวนักเรียน',required:true,readonly:Boolean(id)},{name:'prefix',label:'คำนำหน้า'},{name:'firstName',label:'ชื่อ',required:true},{name:'lastName',label:'นามสกุล',required:true},{name:'number',label:'เลขที่',type:'number',required:true,min:1},{name:'classroomId',label:'ห้องเรียน',options:this.state.classrooms.map(r=>({value:r.id,label:r.name})),required:true},{name:'active',label:'สถานะใช้งาน',options:[{value:'true',label:'กำลังเรียน'},{value:'false',label:'ไม่ใช้งาน'}]}],{...s,firstName:s.firstName||s.name?.split(' ')[0]||'',lastName:s.lastName||s.name?.split(' ').slice(1).join(' ')||'',active:String(s.active!==false)});if(!result)return;await this.call('saveStudent',{...result,id:s.id||'',number:Number(result.number),active:result.active==='true'});await this.loadLists();await this.navigate('students');this.toast('บันทึกนักเรียนแล้ว');}
+  downloadStudentTemplate(){
+    const link=document.createElement('a');
+    link.href='assets/student-import-template.xlsx';
+    link.download='student-import-template.xlsx';
+    document.body.appendChild(link); link.click(); link.remove();
+    this.toast('ดาวน์โหลดแม่แบบ XLS สำเร็จ','success');
+  }
+
   async importStudents(){
     if(!window.XLSX){this.toast('ไม่พบตัวอ่านไฟล์ XLS กรุณาโหลดหน้าเว็บใหม่','error');return;}
     const input=document.createElement('input');input.type='file';input.accept='.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
