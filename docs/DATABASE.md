@@ -86,6 +86,8 @@ key,value,updatedAt,updatedBy
 `value` เก็บ JSON ของค่า เช่น string, boolean หรือรายการผู้บริหาร ค่าที่สร้างเริ่มต้นประกอบด้วย:
 
 - ข้อมูลโรงเรียน: `schoolName`, `affiliation`, `address`, `email`, `website`, `logoUrl`
+
+ชีต `user_emails` เก็บอีเมลรีเซ็ตรหัสผ่านแยกจากชีต `users` และชีต `password_resets` เก็บแฮชของโทเคนที่หมดอายุภายใน 15 นาทีและใช้ครั้งเดียว ระบบไม่เก็บโทเคนจริงลง Google Sheet
 - ผู้บริหาร: `director`, `deputyDirectors` ไม่เกินสามคน
 - ธีม: `primaryColor`, `secondaryColor`
 - รายงาน: `reportTime` รูปแบบ `HH:mm`, `dailyReportEnabled`

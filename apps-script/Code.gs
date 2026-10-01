@@ -9,6 +9,8 @@ function dispatch(request) {
     // Re-check on every request even if an owner re-shares an initialized Sheet.
     Database.assertPrivate();
     if (action === 'login') return { ok:true,data:AuthService.login(payload,requestId) };
+    if (action === 'requestPasswordReset') return { ok:true,data:PasswordResetService.request(payload,requestId) };
+    if (action === 'resetPassword') return { ok:true,data:PasswordResetService.reset(payload,requestId) };
     if (action === 'bootstrap') {
       const data = { settings:SettingsService.publicSettings(),today:today_(),statuses:APP_CONFIG.statuses,version:APP_CONFIG.version };
       if (request.token) { const actor = AuthService.authenticate(request.token,true); data.user = Authorization.user(actor); data.classrooms = AdminService.classrooms(actor); }

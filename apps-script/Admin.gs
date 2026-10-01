@@ -71,7 +71,7 @@ class AdminService {
   }
   static users(actor) {
     Authorization.admin(actor);
-    return Database.repo('users').all().map(user => { const result = Authorization.user(user); result.createdAt = user.createdAt; return result; });
+    return Database.repo('users').all().map(user => { const result = Authorization.user(user); result.email = UserEmailService.get(user.userId); result.createdAt = user.createdAt; return result; });
   }
   static saveUser(actor, payload, requestId) {
     Authorization.admin(actor);
@@ -89,8 +89,9 @@ class AdminService {
       if (!previous || payload.password) Object.assign(user, PasswordCrypto.credentials(payload.password), { mustChangePassword: true });
       if (previous && previous.role === 'admin' && Validation.bool(previous.active) && (user.role !== 'admin' || !user.active) && repo.all().filter(item => item.role === 'admin' && Validation.bool(item.active)).length <= 1) throw new AppError('VALIDATION', 'ต้องมีผู้ดูแลระบบที่เปิดใช้งานอย่างน้อยหนึ่งคน');
       if (previous) { repo.update(user); AuthService.revokeSessions(user.userId); } else repo.append(user);
+      if (Object.prototype.hasOwnProperty.call(payload, 'email')) UserEmailService.save(user.userId, payload.email, actor.userId);
       AuditLog.write(actor, 'save_user', user.userId, previous ? Authorization.user(previous) : null, Authorization.user(user), null, requestId);
-      return Authorization.user(user);
+      const result = Authorization.user(user); result.email = UserEmailService.get(user.userId); return result;
     });
   }
   static saveStudent(actor, payload, requestId) {

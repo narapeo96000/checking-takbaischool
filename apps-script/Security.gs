@@ -132,3 +132,53 @@ class AuthService {
     repo.all().filter(session => session.userId === userId && session.tokenHash !== exceptHash && !session.revokedAt).forEach(session => { session.revokedAt = nowIso_(); repo.update(session); });
   }
 }
+
+class UserEmailService {
+  static get(userId) {
+    const row = Database.repo('user_emails').find('userId', userId);
+    return row ? String(row.email || '') : '';
+  }
+  static save(userId, email, updatedBy) {
+    const value = String(email || '').trim().toLowerCase();
+    if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) throw new AppError('VALIDATION', 'อีเมลไม่ถูกต้อง');
+    const repo = Database.repo('user_emails'), existing = repo.find('userId', userId);
+    if (!value) { if (existing) repo.removeRows([existing._row]); return; }
+    repo.upsert('userId', { userId, email:value, updatedAt:nowIso_(), updatedBy:String(updatedBy || 'system') });
+  }
+}
+
+class PasswordResetService {
+  static request(payload, requestId) {
+    const username = String(payload.username || '').trim().toLowerCase();
+    const email = String(payload.email || '').trim().toLowerCase();
+    if (!/^[a-z0-9_.-]{3,100}$/.test(username) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError('VALIDATION', 'กรุณาระบุชื่อผู้ใช้และอีเมลให้ถูกต้อง');
+    return withLock_(() => {
+      const user = Database.repo('users').all().find(item => String(item.username).toLowerCase() === username && Validation.bool(item.active));
+      const registered = user && UserEmailService.get(user.userId);
+      if (user && registered && registered === email) {
+        const token = uuid_().replace(/-/g,'') + uuid_().replace(/-/g,'');
+        const resetRepo = Database.repo('password_resets');
+        resetRepo.all().filter(row => row.userId === user.userId && !row.usedAt).forEach(row => { row.usedAt = nowIso_(); resetRepo.update(row); });
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        resetRepo.append({ resetId:uuid_(), userId:user.userId, tokenHash:PasswordCrypto.hash(token), expiresAt, usedAt:'', createdAt:nowIso_(), requestEmail:email });
+        MailApp.sendEmail({ to:email, subject:'รีเซ็ตรหัสผ่านระบบเช็คชื่อ โรงเรียนตากใบ', body:'มีคำขอรีเซ็ตรหัสผ่านบัญชี ' + user.username + '\n\nรหัสรีเซ็ตใช้ครั้งเดียวภายใน 15 นาที:\n' + token + '\n\nหากคุณไม่ได้เป็นผู้ขอ ให้เพิกเฉยต่ออีเมลนี้' });
+        AuditLog.write(null, 'request_password_reset', user.userId, null, { emailSent:true }, null, requestId);
+      }
+      return { requested:true, message:'หากข้อมูลตรงกับบัญชี ระบบจะส่งรหัสรีเซ็ตไปยังอีเมลที่ลงทะเบียนไว้' };
+    });
+  }
+  static reset(payload, requestId) {
+    const token = String(payload.token || '').trim(), newPassword = PasswordCrypto.password(String(payload.newPassword || ''));
+    if (!/^[a-f0-9]{64}$/i.test(token)) throw new AppError('VALIDATION', 'รหัสรีเซ็ตไม่ถูกต้องหรือหมดอายุ');
+    return withLock_(() => {
+      const resetRepo = Database.repo('password_resets'), row = resetRepo.all().find(item => item.tokenHash === PasswordCrypto.hash(token) && !item.usedAt && new Date(item.expiresAt).getTime() > Date.now());
+      if (!row) throw new AppError('VALIDATION', 'รหัสรีเซ็ตไม่ถูกต้องหรือหมดอายุ');
+      const userRepo = Database.repo('users'), user = userRepo.find('userId', row.userId);
+      if (!user || !Validation.bool(user.active)) throw new AppError('VALIDATION', 'บัญชีนี้ไม่พร้อมใช้งาน');
+      Object.assign(user, PasswordCrypto.credentials(newPassword), { mustChangePassword:false, updatedAt:nowIso_() }); userRepo.update(user);
+      row.usedAt = nowIso_(); resetRepo.update(row); AuthService.revokeSessions(user.userId);
+      AuditLog.write(user, 'reset_password_by_email', user.userId, null, { changed:true }, null, requestId);
+      return { reset:true };
+    });
+  }
+}

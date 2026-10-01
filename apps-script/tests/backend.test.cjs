@@ -41,12 +41,13 @@ const api=vm.createContext({
   PropertiesService:{getScriptProperties:()=>({getProperty:k=>state.properties.get(k)??null,setProperty:(k,v)=>state.properties.set(k,v),deleteProperty:k=>state.properties.delete(k)})},
   Session:{getActiveUser:()=>({getEmail:()=>state.activeEmail}),getEffectiveUser:()=>({getEmail:()=>state.effectiveEmail})},
   ScriptApp:{getProjectTriggers:()=>state.triggers,deleteTrigger:t=>{state.triggers=state.triggers.filter(x=>x!==t);},newTrigger:n=>({timeBased(){return this;},everyMinutes(m){this.minutes=m;return this;},create(){state.triggers.push({getHandlerFunction:()=>n,minutes:this.minutes});}})},
-  UrlFetchApp:{fetch:(url,options)=>{state.fetches.push({url,options});return {getResponseCode:()=>200,getContentText:()=>'{"ok":true}'};}}
+  UrlFetchApp:{fetch:(url,options)=>{state.fetches.push({url,options});return {getResponseCode:()=>200,getContentText:()=>'{"ok":true}'};}},
+  MailApp:{sendEmail:message=>{state.mail=message;}}
 });
 const directory=path.join(__dirname,'..');
 for(const n of fs.readdirSync(directory).filter(n=>n.endsWith('.gs')))vm.runInContext(fs.readFileSync(path.join(directory,n),'utf8'),api,{filename:n});
-vm.runInContext('Object.assign(globalThis,{APP_CONFIG,SHEET_SCHEMAS,DEFAULT_SETTINGS,AppError,Validation,Database,SheetRepository,PasswordCrypto,AuthService,Authorization,AdminService,SettingsService,AttendanceService,ReportService,NotificationService});',api);
-function reset(){state.sheets.clear();state.cache.clear();state.properties.clear();state.logs=[];state.fetches=[];state.triggers=[];state.lockHeld=false;state.sharingAccess='PRIVATE';state.activeEmail=state.effectiveEmail='owner@school.example';api.Database.instance=null;api.Database.initialize();}
+vm.runInContext('Object.assign(globalThis,{APP_CONFIG,SHEET_SCHEMAS,DEFAULT_SETTINGS,AppError,Validation,Database,SheetRepository,PasswordCrypto,AuthService,Authorization,AdminService,SettingsService,AttendanceService,ReportService,NotificationService,UserEmailService,PasswordResetService});',api);
+function reset(){state.sheets.clear();state.cache.clear();state.properties.clear();state.logs=[];state.fetches=[];state.triggers=[];state.mail=null;state.lockHeld=false;state.sharingAccess='PRIVATE';state.activeEmail=state.effectiveEmail='owner@school.example';api.Database.instance=null;api.Database.initialize();}
 const fixturePassword='Secure-pass-123!',fixtureSalt='unit-test-account-salt';
 const fixtureHash=crypto.pbkdf2Sync(fixturePassword,fixtureSalt,1024,32,'sha256').toString('hex');
 function seed(){
@@ -92,8 +93,19 @@ test('repository grows past initial 1000-row grid without losing prior records',
 
 test('setup/recovery rejects anonymous callers; random temporary admin is log-only',()=>{
   state.activeEmail='';assert.throws(()=>api.setupSystem(),e=>e.code==='FORBIDDEN');assert.throws(()=>api.resetAdminPassword(),e=>e.code==='FORBIDDEN');
-  state.activeEmail=state.effectiveEmail;const r=api.setupSystem();assert.equal(r.createdAdmin,true);assert.equal(JSON.stringify(r).includes('password'),false);
+  state.activeEmail=state.effectiveEmail;const r=api.setupSystem();assert.equal(r.createdAdmin,true);assert.equal(JSON.stringify(r).includes('รหัสผ่านชั่วคราว'),false);
   const u=api.Database.repo('users').all()[0];assert.equal(u.mustChangePassword,true);assert.equal(u.username,'admin');assert.equal(state.logs.some(s=>s.includes('รหัสผ่านชั่วคราว:')),true);assert.equal(api.setupSystem().createdAdmin,false);
+});
+
+test('email password reset sends a one-time token and does not reveal account existence',()=>{
+  const {admin}=seed();
+  api.AdminService.saveUser(admin,{userId:admin.userId,username:'admin',displayName:'ผู้ดูแล',role:'admin',classroomIds:[],active:true,email:'admin@example.com'},'request-email');
+  const sent=api.PasswordResetService.request({username:'admin',email:'admin@example.com'},'reset-request');
+  assert.equal(sent.requested,true);assert.equal(state.mail.to,'admin@example.com');
+  const token=state.mail.body.match(/\n([a-f0-9]{64})\n/)[1];
+  assert.equal(api.PasswordResetService.reset({token,newPassword:'New-secure-pass-12'},'reset-complete').reset,true);
+  assert.equal(api.AuthService.login({username:'admin',password:'New-secure-pass-12'},'login-after-reset').user.username,'admin');
+  assert.deepEqual(api.PasswordResetService.request({username:'missing',email:'admin@example.com'},'unknown-reset').requested,true);
 });
 
 test('public/domain database sharing blocks setup before sheets or credentials are created',()=>{
