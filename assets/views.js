@@ -52,8 +52,16 @@ const recordsTable = (records, showReason = true) => `<div class="table-wrap"><t
 
 export const Views = {
   dashboard(state) {
-    if (!state.user) return gate(state);
     const summary = summaryOf(state);
+    if (!state.user) {
+      const daily = list(state.dashboard?.daily).slice(-7);
+      const date = state.dashboard?.date || state.filters?.date || today();
+      return `${pageHead('ภาพรวมการมาเรียน', 'รายงานสถิติภาพรวม', 'ดูภาพรวมการมาเรียนของโรงเรียนได้ทันที โดยรายละเอียดรายห้องและการเช็คชื่อใช้เมนูเข้าสู่ระบบ', button('เข้าสู่ระบบ', 'go-login', 'login', 'primary'))}${connectionNotice(state)}
+        <div class="overview-banner"><div><span class="overview-label">รายงานประจำวัน</span><h2>${displayDate(date)}</h2><p>${h(state.settings?.schoolName || 'ระบบเช็คชื่อโรงเรียน')} <span class="overview-dot">•</span> ข้อมูลสรุปภาพรวม</p></div><div class="overview-rate"><span>อัตราการมาเรียน</span><strong>${number(Number(summary.rate).toFixed(1))}<small>%</small></strong><span>คำนวณตามค่าน้ำหนักที่ตั้งไว้</span></div></div>
+        ${statCards(summary)}
+        <section class="card trend-card"><div class="card-heading"><div><h2>แนวโน้มการมาเรียน</h2><p>ข้อมูลภาพรวมล่าสุดไม่เกิน 7 วัน</p></div><span class="chart-key"><i></i>มาเรียนรวมสาย</span></div>${daily.length ? `<div class="bar-chart" role="img" aria-label="แนวโน้มการมาเรียนรายวัน">${daily.map(day => { const total=Number(day.total)||0; const value=day.rate!=null?pct(day.rate):total?pct((Number(day.present||0)+Number(day.late||0))/total*100):0; return `<div class="bar-column"><span class="bar-value">${number(value.toFixed(0))}%</span><div class="bar-track"><div class="bar-fill" style="height:${value}%"></div></div><span class="bar-label">${displayDate(day.date).replace(/\s\d{4}$/, '')}</span></div>`; }).join('')}</div>` : empty('ยังไม่มีข้อมูลแนวโน้ม', 'แนวโน้มจะแสดงเมื่อมีการบันทึกการเช็คชื่อ', 'chart')}</section>
+        <div class="inline-note">${icon('shield')}เข้าสู่ระบบเพื่อดูรายงานแบบละเอียด รายชื่อนักเรียน และเมนูเช็คชื่อ</div>`;
+    }
     const rooms = list(state.dashboard?.byClassroom || state.stats?.byClassroom);
     const daily = list(state.dashboard?.daily || state.stats?.daily).slice(-7);
     const date = state.dashboard?.date || state.filters?.dashboard?.date || state.filters?.date || today();

@@ -16,6 +16,7 @@ function dispatch(request) {
       if (request.token) { const actor = AuthService.authenticate(request.token,true); data.user = Authorization.user(actor); data.classrooms = AdminService.classrooms(actor); }
       return { ok:true,data };
     }
+    if (action === 'publicDashboard') return { ok:true,data:ReportService.publicOverview(payload) };
     const actor = AuthService.authenticate(request.token,['changePassword','logout'].includes(action));
     let result;
     switch (action) {
