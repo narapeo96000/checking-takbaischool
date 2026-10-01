@@ -9,7 +9,7 @@ const statusLabels = { present: 'มา', absent: 'ขาด', late: 'สาย'
 const statusIcons = { present: 'check', absent: 'x', late: 'clock', leave: 'pin', unmarked: 'clock' };
 const selected = (value, current) => String(value ?? '') === String(current ?? '') ? ' selected' : '';
 const checked = (value) => value === true || value === 'true' ? ' checked' : '';
-const isAdmin = (state) => state.user?.role === 'admin';
+const isAdmin = (state) => ['admin', 'super_admin'].includes(state.user?.role);
 const isSuperAdmin = (state) => ['super_admin', 'admin'].includes(state.user?.role);
 const displayDate = (value) => {
   if (!value) return '—';
@@ -169,5 +169,10 @@ export const Views = {
   users(state) {
     const users = list(state.users);
     return `${pageHead('จัดการบัญชี', 'ผู้ใช้งานระบบ', 'สิทธิ์ผู้ดูแลระบบและครูที่ปรึกษา', button('เพิ่มผู้ใช้งาน', 'add-user', 'plus', 'primary'))}<section class="card">${users.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>ชื่อ</th><th>ชื่อผู้ใช้งาน</th><th>สิทธิ์</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>${users.map(user => `<tr><td class="table-name">${h(user.displayName || user.name)}</td><td>${h(user.username)}</td><td>${user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูที่ปรึกษา'}</td><td><span class="badge ${user.active !== false ? 'badge-present' : 'badge-unmarked'}">${user.active !== false ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</span></td><td>${button('แก้ไข', 'edit-user', 'edit', 'text', `data-id="${h(user.id)}"`)}</td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีผู้ใช้งาน', 'เพิ่มครูที่ปรึกษาหรือผู้ดูแลระบบ', 'users')}</section>`;
+  },
+
+  teachers(state) {
+    const users = list(state.users).filter(user => user.active !== false);
+    return `${pageHead('รายชื่อบุคลากร', 'รายชื่อครูและบุคลากร', 'รายชื่อสำหรับใช้กำหนดครูที่ปรึกษาในแต่ละห้องเรียน', isAdmin(state) ? button('เพิ่มบุคลากร', 'manage-users', 'plus', 'primary') : '')}<section class="card">${users.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>ชื่อ–นามสกุล</th><th>ชื่อผู้ใช้งาน</th><th>บทบาท</th><th>อีเมล</th><th>สถานะ</th></tr></thead><tbody>${users.map(user => `<tr><td class="table-name">${h(user.displayName || user.name || '—')}</td><td>${h(user.username || '—')}</td><td>${user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ครูที่ปรึกษา'}</td><td>${h(user.email || '—')}</td><td><span class="badge badge-present">เปิดใช้งาน</span></td></tr>`).join('')}</tbody></table></div>` : empty('ยังไม่มีรายชื่อครูและบุคลากร', 'เพิ่มบัญชีผู้ใช้งานเพื่อใช้กำหนดครูที่ปรึกษา', 'users')}</section>`;
   }
 };
