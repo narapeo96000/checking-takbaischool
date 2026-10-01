@@ -1,6 +1,6 @@
 import {Views} from './views.js';
-import {renderUserGuide} from './manual.js';
-import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js';
+import {renderUserGuide} from './manual.js?v=gas-v1-20261001';
+import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=gas-v1-20261001';
 import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl} from './core.js';
 
 export class AttendanceApp {

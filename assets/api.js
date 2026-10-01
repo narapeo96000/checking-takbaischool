@@ -5,9 +5,13 @@ export function validateApiUrl(value){const u=new URL(value);if(u.origin!=='http
 export class AppsScriptApi {
   constructor(url){this.url=validateApiUrl(url);this.token='';this.pending=new Map();this.channel=uuid();this.source=null;this.origin=null;this.listener=this.receive.bind(this);window.addEventListener('message',this.listener);}
   async connect(){if(this.source)return; if(this.ready)return this.ready;
-    this.ready=new Promise((resolve,reject)=>{this.resolveReady=resolve;this.rejectReady=reject;this.readyTimer=setTimeout(()=>{this.ready=null;reject(new ApiError('เชื่อมต่อหลังบ้านไม่ได้ ตรวจ URL และสิทธิ์การเผยแพร่เว็บแอป','CONNECTION'));},25000);});
+    this.channel=uuid();
+    this.ready=new Promise((resolve,reject)=>{this.resolveReady=resolve;this.rejectReady=reject;this.readyTimer=setTimeout(()=>{this.frame?.remove();this.ready=null;this.resolveReady=null;this.channel=uuid();reject(new ApiError('เชื่อมต่อไม่ได้ ตรวจ URL /exec และสิทธิ์ Web App หากใช้ Google หลายบัญชีให้ลองเปิดเว็บในโหมดไม่ระบุตัวตน','CONNECTION'));},25000);});
     const u=new URL(this.url);u.searchParams.set('channel',this.channel);u.searchParams.set('hostOrigin',location.origin);
-    this.frame=document.createElement('iframe');this.frame.title='การเชื่อมต่อระบบเช็คชื่อ';this.frame.hidden=true;this.frame.referrerPolicy='no-referrer';this.frame.src=u.href;document.body.append(this.frame);return this.ready;
+    this.frame=document.createElement('iframe');this.frame.title='การเชื่อมต่อระบบเช็คชื่อ';this.frame.hidden=true;
+    // This public bridge uses app sessions, so Google multi-login cookies are unnecessary.
+    if('credentialless' in this.frame)this.frame.credentialless=true;
+    this.frame.referrerPolicy='no-referrer';this.frame.src=u.href;document.body.append(this.frame);return this.ready;
   }
   receive(event){const msg=event.data;
     if(!/^https:\/\/(?:[a-z0-9-]+\.)?googleusercontent\.com$/.test(event.origin)||!msg||msg.channel!==this.channel)return;

@@ -14,7 +14,7 @@ Web App สำหรับครูเช็คชื่อจากโทรศ
 
 ธีมเริ่มต้นใช้แดงเข้มและน้ำตาล ปรับสีหลักและสีรองเพิ่มเติมได้จากหน้าตั้งค่า อ่าน [คู่มือบนเว็บ](https://narapeo96000.github.io/checking-takbaischool/#guide) หรือ [คู่มือสำหรับผู้ใช้งาน](docs/USER_GUIDE.md)
 
-โค้ดพร้อมสำหรับการนำไปติดตั้ง การเชื่อมต่อฐานข้อมูลจริงต้องให้เจ้าของ Google Sheet อนุญาต Apps Script และเผยแพร่ Web App ก่อน ดู [คู่มือติดตั้ง](docs/DEPLOYMENT.md) การเก็บ source ใน repository ไม่ได้ยืนยันว่าระบบออนไลน์หรือชีตถูกสร้างแล้ว
+หน้าเว็บกำหนดลิงก์ Web App ใน `config.js` แล้ว และตรวจการเชื่อมต่อ Google Sheet เมื่อเปิดใช้งาน รอข้อความ “เชื่อมต่อ Google Sheet” ก่อนเข้าสู่ระบบ บัญชีเริ่มต้น `admin` ต้องตั้งรหัสผ่านใหม่ก่อนเพิ่มครู ห้องเรียน และนักเรียน หากนำไปติดตั้งในโครงการอื่นให้ทำตาม [คู่มือติดตั้ง](docs/DEPLOYMENT.md)
 
 ## ปลายทางของโครงการ
 
@@ -22,6 +22,7 @@ Web App สำหรับครูเช็คชื่อจากโทรศ
 | --- | --- |
 | Repository | [narapeo96000/checking-takbaischool](https://github.com/narapeo96000/checking-takbaischool) |
 | Frontend | [GitHub Pages](https://narapeo96000.github.io/checking-takbaischool/) |
+| Backend | [Google Apps Script Web App](https://script.google.com/macros/s/AKfycbxAp6DvlkJStl1lTz3eoFWByPJD2bxrcGu1cyzVRKwm4gWDs6y0ptcvlgzBIqyiVTznIg/exec) |
 | Database | [Google Sheet](https://docs.google.com/spreadsheets/d/1nqfPAnIifkQV3NrD045__PNK7qe3n-cxBcdeqvfBwUw/edit) |
 | เก็บรายงาน PDF | [Google Drive Folder](https://drive.google.com/drive/folders/1TL_yuWS76ri3H6xcrscIA_jQbGQTx63X) |
 

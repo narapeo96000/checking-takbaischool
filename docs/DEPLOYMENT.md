@@ -33,13 +33,15 @@
 2. ตั้ง **Execute as: Me** และ **Who has access: Anyone** เพื่อให้ frontend เรียก bridge ได้
 3. กด Deploy และอนุญาตสิทธิ์ที่ Google ขอ คัดลอก URL ที่ลงท้าย `/exec`
 4. เปิด `/exec` ในหน้าต่างส่วนตัวเพื่อยืนยันว่าไม่ติดหน้า Google login การเปิดโดยตรงจะแสดงข้อความให้เข้าใช้งานผ่านเว็บไซต์โรงเรียน
-5. เปิดหน้าเว็บ ใส่ URL นี้ในหน้าตั้งค่าการเชื่อมต่อ แล้วเข้าสู่ระบบด้วยบัญชีแอป
+5. URL ของ Web App ที่เผยแพร่แล้วกำหนดใน `config.js` หน้าเว็บอ่านค่านี้และตรวจการเชื่อมต่อเมื่อเริ่มต้น รอข้อความเชื่อมต่อสำเร็จแล้วเข้าสู่ระบบด้วยบัญชีแอป หากเปลี่ยน deployment ให้แก้ `apiUrl` และเผยแพร่ frontend ใหม่ หรือใส่ URL ใหม่ในหน้าตั้งค่าการเชื่อมต่อของอุปกรณ์
 
 การตั้ง Anyone เปิดให้เข้าถึงจุดเชื่อมต่อได้ แต่ข้อมูลนักเรียนและการบันทึกต้องผ่าน session และสิทธิ์บน backend ครูเข้าถึงเฉพาะห้องที่ได้รับมอบหมาย ผู้ดูแลเข้าถึงการตั้งค่าได้ ห้ามนำ OAuth token ของเจ้าของ Google ไปใส่ frontend ตาม [ข้อควรระวังของ Google](https://developers.google.com/apps-script/guides/web)
 
 บัญชี Google Workspace บางองค์กรจำกัดการเผยแพร่ภายนอก หากไม่มี Anyone ให้ผู้ดูแลโดเมนตรวจนโยบาย audience แบบอื่นต้องทดสอบกับผู้ใช้จริงทุกกลุ่ม ใช้ `/exec` สำหรับงานจริง `/dev` ใช้ทดสอบสำหรับผู้มีสิทธิ์แก้ไขโครงการ เมื่อแก้โค้ดแล้วเลือก **Deploy → Manage deployments → Edit → New version → Deploy** เพื่ออัปเดต deployment เดิม
 
 ค่า `allowedOrigins` ใน `Config.gs` อนุญาต origin `https://narapeo96000.github.io`, `http://localhost:4173` และ `http://127.0.0.1:4173` ถ้าเปลี่ยนโดเมน ให้เพิ่ม origin ที่จำเป็นโดยไม่มี path แล้วเผยแพร่เวอร์ชันใหม่ ห้ามใช้ wildcard แทนการตรวจ origin
+
+Frontend ตั้ง iframe เชื่อมต่อเป็น `credentialless` ก่อนโหลด Web App เพื่อให้เบราว์เซอร์ที่รองรับใช้บริบทชั่วคราวที่แยกจากคุกกี้และข้อมูลบัญชี Google เดิม ฟีเจอร์นี้ยังรองรับไม่ครบทุกเบราว์เซอร์ตาม [MDN: HTMLIFrameElement.credentialless](https://developer.mozilla.org/en-US/docs/Web/API/HTMLIFrameElement/credentialless) การแยกบริบทช่วยลดปัญหาการเลือกบัญชี Google หลายบัญชี โดยยังตรวจ origin, nonce, session และสิทธิ์ของบัญชีแอปตามเดิม ผู้ใช้ครูเข้าสู่ระบบด้วยบัญชีของแอป
 
 ## 4. เผยแพร่ GitHub Pages
 
@@ -107,6 +109,8 @@ LINE Notify ยุติบริการแล้วเมื่อ 31 มี�
 ## แก้ปัญหา
 
 **เชื่อมต่อ timeout:** ตรวจ URL `/exec`, deployment เวอร์ชันล่าสุด, audience และ OAuth ของเจ้าของ ดู Apps Script Executions ประกอบ HtmlService อยู่ภายใน iframe ของ Google และใช้ HTTPS ตาม [ข้อจำกัด HTML Service](https://developers.google.com/apps-script/guides/html/restrictions) ต้องทดสอบ bridge บน browser ที่โรงเรียนใช้
+
+**เชื่อมต่อ timeout หรือ Google เปลี่ยน URL เป็น `/macros/u/...` แล้วขึ้นไม่พบเพจ:** อาจเกี่ยวกับการลงชื่อเข้าใช้ Google หลายบัญชี หากเบราว์เซอร์ไม่รองรับหรือไม่ใช้ `credentialless` ให้ทดลองเปิดหน้าเว็บโรงเรียนในหน้าต่างไม่ระบุตัวตนใหม่ หรือโปรไฟล์เบราว์เซอร์ที่ใช้ Google บัญชีเดียว Google ระบุว่า Apps Script ไม่รองรับ multi-login และแนะนำการแยกบัญชีหรือใช้หน้าต่างส่วนตัวใน [คู่มือแก้ปัญหาหลายบัญชี](https://developers.google.com/apps-script/guides/support/troubleshooting#issues_with_multiple_google_accounts) ซิงก์รายการค้างในเบราว์เซอร์เดิมให้หมดก่อนเปลี่ยนโปรไฟล์หรือหน้าต่าง ไม่ต้องผ่อนการตรวจ origin/nonce หรือเปิด Sheet เป็นสาธารณะเพื่อแก้ปัญหานี้
 
 **iframe ถูกบล็อก:** ตรวจว่าติดตั้ง HTML ครบและ `doGet()` ใช้ `XFrameOptionsMode.ALLOWALL` ตาม [API อ้างอิง](https://developers.google.com/apps-script/reference/html/x-frame-options-mode) ถ้ายังถูกบล็อกให้ตรวจนโยบายโดเมนและ response headers ของ deployment จริง ห้ามผ่อนการตรวจ origin/session เพื่อแก้ timeout
 
