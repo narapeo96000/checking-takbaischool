@@ -64,7 +64,7 @@ class Validation {
   }
   static bool(value, fallback) {
     if (value == null || value === '') return !!fallback;
-    return value === true || value === 'true' || value === 1 || value === '1';
+    return value === true || value === 1 || value === '1' || (typeof value === 'string' && value.trim().toLowerCase() === 'true');
   }
   static url(value, label) {
     const result = this.text(value, 2048);
