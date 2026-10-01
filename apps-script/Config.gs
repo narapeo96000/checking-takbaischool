@@ -4,6 +4,7 @@ const APP_CONFIG = Object.freeze({
   spreadsheetId: '1nqfPAnIifkQV3NrD045__PNK7qe3n-cxBcdeqvfBwUw',
   reportFolderId: '1TL_yuWS76ri3H6xcrscIA_jQbGQTx63X',
   frontendUrl: 'https://narapeo96000.github.io/checking-takbaischool/',
+  publicDatabaseOptInProperty: 'ALLOW_PUBLIC_DATABASE',
   timezone: 'Asia/Bangkok',
   allowedOrigins: ['https://narapeo96000.github.io', 'http://localhost:4173', 'http://127.0.0.1:4173'],
   sessionHours: 12,

@@ -66,7 +66,8 @@ class Database {
     // link-public or organization-public database. Named school members may
     // retain explicit access; this check never changes the user's permissions.
     const access = DriveApp.getFileById(APP_CONFIG.spreadsheetId).getSharingAccess();
-    if (access !== DriveApp.Access.PRIVATE) throw new AppError('PRIVATE_DATABASE_REQUIRED', 'กรุณาตั้งค่าการแชร์ Google Sheet ฐานข้อมูลเป็น “จำกัด” และให้สิทธิ์เฉพาะบัญชีโรงเรียนที่จำเป็นก่อนใช้งาน ระบบจะไม่เขียนข้อมูลนักเรียน รหัสผ่าน หรือเซสชันลงชีตที่เปิดแชร์สาธารณะหรือทั้งองค์กร');
+    const optIn = PropertiesService.getScriptProperties().getProperty(APP_CONFIG.publicDatabaseOptInProperty) === 'true';
+    if (access !== DriveApp.Access.PRIVATE && !optIn) throw new AppError('PRIVATE_DATABASE_REQUIRED', 'กรุณาตั้งค่าการแชร์ Google Sheet ฐานข้อมูลเป็น “จำกัด” หรือยืนยันการใช้ฐานข้อมูลสาธารณะด้วย Script Property ALLOW_PUBLIC_DATABASE=true ก่อนใช้งาน');
     return true;
   }
   static open() {
