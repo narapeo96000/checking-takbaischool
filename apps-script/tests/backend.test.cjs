@@ -157,6 +157,13 @@ test('advisor ACL covers list/statistics/attendance/admin APIs and reads current
   teacher.active=false;api.Database.repo('users').update(teacher);assert.equal(api.dispatch({action:'listStudents',token:auth.token,payload:{}}).error.code,'UNAUTHORIZED');
 });
 
+test('settings are restricted to the super administrator role',()=>{
+  const {admin}=seed(), advisor=api.Database.repo('users').find('userId','advisor-a');
+  assert.throws(()=>api.SettingsService.get(advisor),e=>e.code==='FORBIDDEN');
+  const superAdmin={...admin,role:'super_admin'};
+  assert.equal(api.SettingsService.get(superAdmin).schoolName,'โรงเรียนตากใบ');
+});
+
 test('mutations dedupe retry, preserve reasons, reject stale revisions, retain clear audit',()=>{
   const {teacher}=seed(),date=api.today_();assert.equal(api.AttendanceService.get(teacher,{date,classroomId:'A'}).summary.unmarked,2);
   const p=mutation([{studentId:'00001',status:'leave',reason:'ไปพบแพทย์'},{studentId:'00002',status:'present',reason:''}]);

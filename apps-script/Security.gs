@@ -58,6 +58,8 @@ class PasswordCrypto {
 
 class Authorization {
   static admin(actor) { if (!actor || actor.role !== 'admin') throw new AppError('FORBIDDEN', 'เฉพาะผู้ดูแลระบบเท่านั้น'); }
+  // Existing admin accounts are the legacy name for the single super administrator role.
+  static superAdmin(actor) { if (!actor || !['super_admin','admin'].includes(actor.role)) throw new AppError('FORBIDDEN', 'เฉพาะ Super Admin เท่านั้น'); }
   static rooms(actor) {
     const classrooms = Database.repo('classrooms').all();
     if (actor.role === 'admin') return classrooms;

@@ -10,7 +10,7 @@ class SettingsService {
     return result;
   }
   static get(actor) {
-    Authorization.admin(actor);
+    Authorization.superAdmin(actor);
     const values = this.all(), properties = PropertiesService.getScriptProperties();
     values.lineConfigured = !!properties.getProperty('LINE_CHANNEL_ACCESS_TOKEN');
     values.telegramConfigured = !!properties.getProperty('TELEGRAM_BOT_TOKEN');
@@ -18,7 +18,7 @@ class SettingsService {
     return values;
   }
   static save(actor, payload, requestId) {
-    Authorization.admin(actor);
+    Authorization.superAdmin(actor);
     return withLock_(() => {
       const before = this.all(), next = Object.assign({}, before);
       ['schoolName','affiliation','address','email','director','lineTargetId','telegramChatId'].forEach(key => { if (Object.prototype.hasOwnProperty.call(payload, key)) next[key] = Validation.text(payload[key], key === 'address' ? 1000 : 250); });
