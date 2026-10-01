@@ -6,6 +6,7 @@ import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl} from '
 export class AttendanceApp {
   constructor(){
     this.api=null;this.queue=null;this.syncing=false;this.loadVersion=0;this.reasonTimers=new Map();
+    if(typeof matchMedia==='function'&&!matchMedia('(max-width: 900px)').matches)document.body.classList.add('sidebar-collapsed');
     let remembered={username:'',password:''};try{remembered=JSON.parse(localStorage.getItem('checking:remember-login')||'null')||remembered;}catch{}
     this.state={user:null,loginPrefs:{username:String(remembered.username||''),password:String(remembered.password||''),remember:Boolean(remembered.username&&remembered.password),show:false},settings:{schoolName:'โรงเรียนตากใบ',primaryColor:'#b91c1c',secondaryColor:'#2563eb',attendanceWeights:{present:1,leave:0.5,late:0.25,absent:0}},classrooms:[],students:[],attendance:{date:today(),classroomId:'',students:[],records:[],search:''},filters:{date:today(),dateFrom:today(),dateTo:today(),classroomId:'',advisorId:'',studentId:'',search:''},stats:{summary:summarize([],0),records:[],daily:[],byClassroom:[]},dashboard:{},connection:'disconnected',route:'login',loading:false,saveState:'idle',location:{status:'idle'},demo:false};
     document.addEventListener('click',event=>this.click(event).catch(error=>this.error(error)));
