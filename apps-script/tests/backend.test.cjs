@@ -78,6 +78,12 @@ test('SHA-256 and PBKDF2 match independent crypto vectors',()=>{
   const c=api.PasswordCrypto.credentials(fixturePassword);assert.equal(c.passwordIterations,120000);assert.equal(c.passwordHash,crypto.pbkdf2Sync(fixturePassword,c.passwordSalt,120000,32,'sha256').toString('hex'));assert.notEqual(c.passwordHash,fixturePassword);
 });
 
+test('password policy accepts simple four-digit passwords',()=>{
+  assert.equal(api.PasswordCrypto.password('1234'),'1234');
+  assert.equal(api.PasswordCrypto.password('abcd'),'abcd');
+  assert.throws(()=>api.PasswordCrypto.password('123'),e=>e.code==='VALIDATION');
+});
+
 test('initialization preserves data, is idempotent, seeds no people and rejects bad headers',()=>{
   assert.equal(api.Database.repo('students').all().length,0);assert.deepEqual([...state.sheets.keys()].sort(),Object.keys(api.SHEET_SCHEMAS).sort());
   const n=api.Database.repo('settings').all().length;api.Database.initialize();assert.equal(api.Database.repo('settings').all().length,n);

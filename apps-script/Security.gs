@@ -47,7 +47,7 @@ class PasswordCrypto {
     return difference === 0;
   }
   static password(value) {
-    if (typeof value !== 'string' || value.length < 12 || value.length > 128) throw new AppError('VALIDATION', 'รหัสผ่านต้องยาว 12–128 ตัวอักษร');
+    if (typeof value !== 'string' || value.length < 4 || value.length > 128) throw new AppError('VALIDATION', 'รหัสผ่านต้องยาว 4–128 ตัวอักษร');
     return value;
   }
   static credentials(password) {
