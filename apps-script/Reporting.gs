@@ -4,17 +4,8 @@ class ReportService {
     const date = Validation.date(payload.date || today_());
     const effectiveDate = date > today_() ? today_() : date;
     const weights = SettingsService.all().attendanceWeights;
-    let students = Database.repo('students').all().filter(student => Validation.bool(student.active));
-    let records = Database.repo('attendance').all();
-    // Keep the public aggregate resilient to legacy/imported boolean cells. If
-    // the typed repository cannot map those rows, read only the safe aggregate
-    // columns directly and never expose student identities.
-    if (!students.length) {
-      const sheet = SpreadsheetApp.openById(APP_CONFIG.spreadsheetId).getSheetByName('students');
-      const values = sheet ? sheet.getDataRange().getValues() : [];
-      const headers = values.shift() || [], activeIndex = headers.indexOf('active');
-      students = values.filter(row => activeIndex < 0 || Validation.bool(row[activeIndex])).map(() => ({ active: true }));
-    }
+    const students = Database.repo('students').all().filter(student => Validation.bool(student.active));
+    const records = Database.repo('attendance').all();
     const summary = AttendanceService.summary(records.filter(record => record.date === effectiveDate), students.length, weights);
     summary.rate = summary.total ? Math.round((summary.present * weights.present + summary.leave * weights.leave + summary.late * weights.late + summary.absent * weights.absent) / summary.total * 10000) / 100 : 0;
     const daily = [];
