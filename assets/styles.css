@@ -1,4 +1,5 @@
 
+#guide-top{scroll-margin-top:96px}
 
 :root{--primary:#a5262c;--primary-dark:#7f1d25;--primary-soft:#f9e9e7;--secondary:#795548;--sidebar:#34251f;--ink:#332620;--muted:#75635b;--line:#e9dfd9;--canvas:#faf7f5;--white:#fff;--radius:16px;--shadow:0 2px 4px #3b241d03,0 8px 24px #3b241d03;font-family:'Noto Sans Thai',Tahoma,Arial,sans-serif;font-synthesis:none;color:var(--ink);background:var(--canvas)}
 [hidden]{display:none!important}
