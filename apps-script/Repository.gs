@@ -74,7 +74,9 @@ class Database {
     if (!this.instance) { this.assertPrivate(); this.instance = SpreadsheetApp.openById(APP_CONFIG.spreadsheetId); }
     return this.instance;
   }
+  static openPublic() { return SpreadsheetApp.openById(APP_CONFIG.spreadsheetId); }
   static repo(name) { return new SheetRepository(name, this.open()); }
+  static repoPublic(name) { if (!['public_stats','settings'].includes(name)) throw new AppError('PUBLIC_DATA_SCOPE', 'ข้อมูลนี้ไม่เปิดเผยแบบสาธารณะ'); return new SheetRepository(name, this.openPublic()); }
   static initialize() {
     this.assertPrivate();
     const spreadsheet = this.open();

@@ -1,11 +1,11 @@
 class SettingsService {
-  static all() {
+  static all(publicRead=false) {
     const result = jsonClone_(DEFAULT_SETTINGS);
-    Database.repo('settings').all().forEach(row => { if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, row.key)) { try { result[row.key] = JSON.parse(row.value); } catch (error) { result[row.key] = row.value; } } });
+    (publicRead ? Database.repoPublic('settings') : Database.repo('settings')).all().forEach(row => { if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, row.key)) { try { result[row.key] = JSON.parse(row.value); } catch (error) { result[row.key] = row.value; } } });
     return result;
   }
   static publicSettings() {
-    const values = this.all(), result = {};
+    const values = this.all(true), result = {};
     ['schoolName','affiliation','address','email','website','logoUrl','director','deputyDirectors','reportTime','primaryColor','secondaryColor'].forEach(key => { result[key] = values[key]; });
     return result;
   }

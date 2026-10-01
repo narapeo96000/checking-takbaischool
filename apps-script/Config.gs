@@ -25,7 +25,8 @@ const SHEET_SCHEMAS = Object.freeze({
   sessions: ['tokenHash', 'userId', 'expiresAt', 'createdAt', 'revokedAt'],
   mutations: ['mutationId', 'userId', 'action', 'payloadHash', 'resultJson', 'createdAt'],
   user_emails: ['userId', 'email', 'updatedAt', 'updatedBy'],
-  password_resets: ['resetId', 'userId', 'tokenHash', 'expiresAt', 'usedAt', 'createdAt', 'requestEmail']
+  password_resets: ['resetId', 'userId', 'tokenHash', 'expiresAt', 'usedAt', 'createdAt', 'requestEmail'],
+  public_stats: ['date', 'present', 'absent', 'late', 'leave', 'unmarked', 'total', 'rate', 'updatedAt']
 });
 
 const DEFAULT_SETTINGS = Object.freeze({

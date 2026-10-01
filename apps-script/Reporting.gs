@@ -3,17 +3,14 @@ class ReportService {
   static publicOverview(payload) {
     const date = Validation.date(payload.date || today_());
     const effectiveDate = date > today_() ? today_() : date;
-    const weights = SettingsService.all().attendanceWeights;
-    const students = Database.repo('students').all().filter(student => Validation.bool(student.active));
-    const records = Database.repo('attendance').all();
-    const summary = AttendanceService.summary(records.filter(record => record.date === effectiveDate), students.length, weights);
-    summary.rate = summary.total ? Math.round((summary.present * weights.present + summary.leave * weights.leave + summary.late * weights.late + summary.absent * weights.absent) / summary.total * 10000) / 100 : 0;
+    const weights = SettingsService.all(true).attendanceWeights;
+    const publicRows = Database.repoPublic('public_stats').all();
+    const summary = Object.assign({ date: effectiveDate }, publicRows.find(row => row.date === effectiveDate) || { present: 0, absent: 0, late: 0, leave: 0, unmarked: 0, total: 0, rate: 0 });
     const daily = [];
     const anchor = new Date(effectiveDate + 'T00:00:00Z');
     for (let offset = 6; offset >= 0; offset--) {
       const day = new Date(anchor.getTime() - offset * 86400000).toISOString().slice(0,10);
-      const item = AttendanceService.summary(records.filter(record => record.date === day), students.length, weights);
-      item.rate = item.total ? Math.round((item.present * weights.present + item.leave * weights.leave + item.late * weights.late + item.absent * weights.absent) / item.total * 10000) / 100 : 0;
+      const item = publicRows.find(row => row.date === day) || { present: 0, absent: 0, late: 0, leave: 0, unmarked: 0, total: 0, rate: 0 };
       daily.push(Object.assign({ date: day }, item));
     }
     return { date: effectiveDate, summary, daily, attendanceWeights: weights, public: true };

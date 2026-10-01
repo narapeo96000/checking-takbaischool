@@ -6,7 +6,10 @@ function dispatch(request) {
     action = Validation.text(request.action,80); requestId = Validation.text(request.requestId,100);
     const payload = request.payload || {};
     if (typeof payload !== 'object' || Array.isArray(payload)) throw new AppError('VALIDATION','ข้อมูลคำขอไม่ถูกต้อง');
-    // Re-check on every request even if an owner re-shares an initialized Sheet.
+    // Public dashboard/bootstrap read only the dedicated public_stats/settings data.
+    if (action === 'publicDashboard') return { ok:true,data:ReportService.publicOverview(payload) };
+    if (action === 'bootstrap' && !request.token) return { ok:true,data:{ settings:SettingsService.publicSettings(),today:today_(),statuses:APP_CONFIG.statuses,version:APP_CONFIG.version } };
+    // Re-check on every protected request even if an owner re-shares an initialized Sheet.
     Database.assertPrivate();
     if (action === 'login') return { ok:true,data:AuthService.login(payload,requestId) };
     if (action === 'requestPasswordReset') return { ok:true,data:PasswordResetService.request(payload,requestId) };
@@ -16,7 +19,6 @@ function dispatch(request) {
       if (request.token) { const actor = AuthService.authenticate(request.token,true); data.user = Authorization.user(actor); data.classrooms = AdminService.classrooms(actor); }
       return { ok:true,data };
     }
-    if (action === 'publicDashboard') return { ok:true,data:ReportService.publicOverview(payload) };
     const actor = AuthService.authenticate(request.token,['changePassword','logout'].includes(action));
     let result;
     switch (action) {

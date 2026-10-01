@@ -78,8 +78,21 @@ class AttendanceService {
       const updatedBatch = Object.assign({}, batch, { revision: result.revision, updatedAt: time, updatedBy: actor.userId });
       if (batch._row) batches.update(updatedBatch); else batches.append(updatedBatch);
       mutations.append({ mutationId, userId: actor.userId, action, payloadHash: fingerprint, resultJson: JSON.stringify(result), createdAt: time });
+      PublicStatsService.refreshDate(date);
       SpreadsheetApp.flush();
       return result;
     });
+  }
+}
+
+class PublicStatsService {
+  static refreshDate(date) {
+    const students = Database.repo('students').all().filter(student => Validation.bool(student.active));
+    const records = Database.repo('attendance').all().filter(record => record.date === date);
+    const summary = AttendanceService.summary(records, students.length, SettingsService.all().attendanceWeights);
+    const repo = Database.repo('public_stats'), existing = repo.find('date', date);
+    const row = Object.assign({}, existing || {}, { date, present: summary.present, absent: summary.absent, late: summary.late, leave: summary.leave, unmarked: summary.unmarked, total: summary.total, rate: summary.rate, updatedAt: nowIso_() });
+    if (existing) repo.update(row); else repo.append(row);
+    return row;
   }
 }
