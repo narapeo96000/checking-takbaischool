@@ -68,6 +68,8 @@ export class AttendanceApp {
       case 'add-student':await this.editStudent();break;
       case 'download-student-template':this.downloadStudentTemplate();break;
       case 'import-students':await this.importStudents();break;
+      case 'download-teacher-template':this.downloadTeacherTemplate();break;
+      case 'import-teachers':await this.importTeachers();break;
       case 'edit-student':await this.editStudent(button.dataset.id);break;
       case 'manage-classrooms':await this.manageClassrooms();break;
       case 'manage-users':await this.manageUsers();break;
@@ -148,6 +150,26 @@ export class AttendanceApp {
     document.body.appendChild(link); link.click(); link.remove();
     this.toast('ดาวน์โหลดแม่แบบ XLS สำเร็จ','success');
   }
+
+  downloadTeacherTemplate(){
+    if(!window.XLSX){this.toast('ไม่พบตัวสร้างไฟล์ XLS กรุณาโหลดหน้าเว็บใหม่','error');return;}
+    const rows=[{username:'ครูสมชาย',name:'สมชาย ใจดี',email:'teacher@example.com',role:'advisor',password:'1234'}];
+    const workbook=window.XLSX.utils.book_new();const sheet=window.XLSX.utils.json_to_sheet(rows);window.XLSX.utils.book_append_sheet(workbook,sheet,'teachers');window.XLSX.writeFile(workbook,'teacher-import-template.xlsx');this.toast('ดาวน์โหลดแม่แบบครูและบุคลากรสำเร็จ','success');
+  }
+
+  async importTeachers(){
+    if(!window.XLSX){this.toast('ไม่พบตัวอ่านไฟล์ XLS กรุณาโหลดหน้าเว็บใหม่','error');return;}
+    const input=document.createElement('input');input.type='file';input.accept='.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const file=await new Promise(resolve=>{input.onchange=()=>resolve(input.files?.[0]||null);input.click();});if(!file)return;
+    this.showBusyAlert('กำลังตรวจสอบไฟล์ครูและบุคลากร…');
+    const workbook=window.XLSX.read(await file.arrayBuffer(),{type:'array'}),sheet=workbook.Sheets[workbook.SheetNames[0]],raw=window.XLSX.utils.sheet_to_json(sheet,{defval:''});
+    const pick=(row,names)=>{const key=Object.keys(row).find(k=>names.includes(String(k).trim().toLowerCase()));return key===undefined?'':row[key];};
+    const rows=raw.map(row=>({username:String(pick(row,['username','ชื่อผู้ใช้','ชื่อผู้ใช้งาน'])).trim().toLowerCase(),name:String(pick(row,['name','ชื่อ-สกุล','ชื่อสกุล','ชื่อบุคลากร'])).trim(),email:String(pick(row,['email','อีเมล'])).trim().toLowerCase(),role:String(pick(row,['role','สิทธิ์','บทบาท'])).trim().toLowerCase()||'advisor',password:String(pick(row,['password','รหัสผ่าน'])).trim(),active:true}));
+    const existing=new Set((this.state.users||[]).map(user=>String(user.username||'').toLowerCase())),seen=new Set(),invalid=[],duplicates=[];
+    rows.forEach((row,index)=>{if(!/^[a-z0-9_.-]{3,100}$/.test(row.username)||!row.name||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)||!['admin','advisor'].includes(row.role)||row.password.length<4)invalid.push(`แถว ${index+2}: ตรวจสอบชื่อผู้ใช้ ชื่อ อีเมล สิทธิ์ และรหัสผ่านอย่างน้อย 4 ตัว`);if(seen.has(row.username)||existing.has(row.username))duplicates.push(row.username);seen.add(row.username);});
+    this.closeBusyAlert();if(invalid.length||duplicates.length||!rows.length){await this.modal({title:'ตรวจสอบไฟล์ไม่ผ่าน',html:`${!rows.length?'<p>ไม่พบข้อมูลในไฟล์</p>':''}${invalid.length?`<p>${e(invalid.slice(0,10).join('<br>'))}</p>`:''}${duplicates.length?`<p>ชื่อผู้ใช้ซ้ำ: <strong>${e([...new Set(duplicates)].slice(0,20).join(', '))}</strong></p>`:''}<p>ระบบยังไม่ได้บันทึกข้อมูลใด ๆ</p>`,icon:'error',showCancelButton:false,confirmButtonText:'กลับไปแก้ไฟล์'});return;}
+    const confirm=await this.modal({title:'ยืนยันนำเข้าครูและบุคลากร',text:`พบข้อมูล ${rows.length} คนจาก ${file.name}`,icon:'question',confirmButtonText:'นำเข้า'});if(!confirm.isConfirmed)return;
+    this.showBusyAlert(`กำลังบันทึกข้อมูล 0/${rows.length} คน…`);let imported=0;try{for(const row of rows){await this.call('saveUser',{...row,id:''});imported++;this.showBusyAlert(`กำลังบันทึกข้อมูล ${imported}/${rows.length} คน…`);}this.closeBusyAlert();this.state.users=await this.call('listUsers');this.render();await this.showStatusAlert('นำเข้ารายชื่อสำเร็จ','success',`บันทึกครูและบุคลากร ${imported} คนแล้ว`);}catch(error){this.closeBusyAlert();await this.showStatusAlert('นำเข้ารายชื่อไม่สำเร็จ','error',`บันทึกได้ ${imported} จาก ${rows.length} คน: ${error.message}`);}}
 
   async importStudents(){
     if(!window.XLSX){this.toast('ไม่พบตัวอ่านไฟล์ XLS กรุณาโหลดหน้าเว็บใหม่','error');return;}
