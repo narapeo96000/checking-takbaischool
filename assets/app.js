@@ -159,8 +159,16 @@ export class AttendanceApp {
     if(!window.Swal)throw new Error('เปิดแบบฟอร์มไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วโหลดหน้าใหม่');const result=await this.modal({title,html,showCancelButton:cancel,allowOutsideClick:cancel,allowEscapeKey:cancel,preConfirm:()=>{const form=document.getElementById('modal-form');if(!form.reportValidity())return false;return Object.fromEntries(new FormData(form));}});return result.isConfirmed?result.value:null;}
   toast(message,type='success'){
     if(window.Swal){
-      const Toast=Swal.mixin({toast:true,position:'top-end',showConfirmButton:false,timer:type==='error'?5000:3500,timerProgressBar:true,customClass:{popup:'swal-status-toast'}});
-      Toast.fire({icon:type==='error'?'error':type==='info'?'info':'success',title:message});
+      Swal.fire({
+        position:'center',
+        icon:type==='error'?'error':type==='info'?'info':'success',
+        title:message,
+        showConfirmButton:false,
+        timer:type==='error'?5000:type==='info'?2400:3200,
+        timerProgressBar:true,
+        allowOutsideClick:false,
+        customClass:{popup:'swal-status-popup'}
+      });
       return;
     }
     const el=document.getElementById('toast');el.textContent=message;el.className=`toast visible ${type}`;clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.remove('visible'),6000);

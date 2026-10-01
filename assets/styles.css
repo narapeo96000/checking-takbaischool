@@ -58,3 +58,5 @@
   .sidebar-collapsed .sidebar:hover .sidebar-footer{padding:20px 12px 0}
   .sidebar-collapsed .sidebar:hover .sidebar-toggle{margin-top:15px}
 }
+/* Centered SweetAlert status popup */
+.swal-status-popup{border-top:5px solid var(--primary)!important;min-width:320px!important;padding:28px 25px!important}.swal-status-popup .swal2-icon{margin:0 auto 15px!important}.swal-status-popup .swal2-title{margin:0!important}
