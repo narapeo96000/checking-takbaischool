@@ -1,0 +1,15 @@
+{
+  "spreadsheetId": "1nqfPAnIifkQV3NrD045__PNK7qe3n-cxBcdeqvfBwUw",
+  "timezone": "Asia/Bangkok",
+  "sheets": {
+    "students": ["studentId", "prefix", "firstName", "lastName", "classroomId", "number", "active", "createdAt", "updatedAt"],
+    "classrooms": ["classroomId", "name", "level", "advisorId", "active", "createdAt", "updatedAt"],
+    "users": ["userId", "username", "displayName", "role", "classroomIds", "active", "mustChangePassword", "passwordSalt", "passwordHash", "passwordIterations", "createdAt", "updatedAt"],
+    "attendance": ["attendanceId", "date", "classroomId", "studentId", "status", "reason", "latitude", "longitude", "accuracy", "capturedAt", "locationError", "updatedBy", "updatedAt"],
+    "attendance_batches": ["batchId", "date", "classroomId", "revision", "updatedAt", "updatedBy"],
+    "settings": ["key", "value", "updatedAt", "updatedBy"],
+    "logs": ["logId", "timestamp", "actorId", "actorName", "action", "entityId", "beforeJson", "afterJson", "locationJson", "requestId"],
+    "sessions": ["tokenHash", "userId", "expiresAt", "createdAt", "revokedAt"],
+    "mutations": ["mutationId", "userId", "action", "payloadHash", "resultJson", "createdAt"]
+  }
+}

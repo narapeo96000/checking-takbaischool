@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="th">
+<head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Attendance connection</title></head>
+<body>
+<script>
+(() => {
+  'use strict';
+  const configuration = <?!= configJson ?>;
+  const allowedOrigin = configuration.hostOrigin;
+  const channel = configuration.channel;
+  const host = window.top;
+  if (window === host) return;
+  const reply = (requestId, result) => host.postMessage({ type:'CHECKING_RESPONSE', channel, requestId, result },allowedOrigin);
+  window.addEventListener('message', event => {
+    const message = event.data;
+    if (event.source !== host || event.origin !== allowedOrigin || !message || message.type !== 'CHECKING_REQUEST' || message.channel !== channel || typeof message.requestId !== 'string' || message.requestId.length > 100) return;
+    const request = message.request;
+    if (!request || typeof request !== 'object' || request.requestId !== message.requestId) return;
+    google.script.run.withSuccessHandler(result => reply(message.requestId,result)).withFailureHandler(() => reply(message.requestId,{ ok:false,error:{ code:'TRANSPORT',message:'เชื่อมต่อบริการไม่สำเร็จ กรุณาลองใหม่' } })).dispatch(request);
+  });
+  host.postMessage({ type:'CHECKING_READY',channel },allowedOrigin);
+})();
+</script>
+</body>
+</html>

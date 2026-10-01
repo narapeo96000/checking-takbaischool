@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('..',import.meta.url));
+const output=path.join(root,'artifacts');await fs.mkdir(output,{recursive:true});
+const order=['Config.gs','Repository.gs','Security.gs','Admin.gs','Attendance.gs','Reporting.gs','Notifications.gs','Code.gs'];
+const files=(await fs.readdir(path.join(root,'apps-script'))).filter(f=>f.endsWith('.gs')).sort((a,b)=>{const ai=order.indexOf(a),bi=order.indexOf(b);return (ai<0?99:ai)-(bi<0?99:bi);});
+let text='// GENERATED from apps-script sources. Paste into one Code.gs file.\n';
+for(const file of files)text+=`\n// ----- ${file} -----\n${await fs.readFile(path.join(root,'apps-script',file),'utf8')}\n`;
+await fs.writeFile(path.join(output,'Code.gs'),text);await fs.copyFile(path.join(root,'apps-script','Bridge.html'),path.join(output,'Bridge.html'));await fs.copyFile(path.join(root,'apps-script','appsscript.json'),path.join(output,'appsscript.json'));console.log('Apps Script installation bundle prepared.');

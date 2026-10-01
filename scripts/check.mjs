@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('..',import.meta.url));
+for(const dir of ['assets','scripts'])for(const file of fs.readdirSync(path.join(root,dir)).filter(f=>/\.(m?js)$/.test(f)))execFileSync(process.execPath,['--check',path.join(root,dir,file)],{stdio:'inherit'});
+const files=fs.readdirSync(path.join(root,'apps-script')).filter(f=>f.endsWith('.gs'));
+new vm.Script(files.map(f=>fs.readFileSync(path.join(root,'apps-script',f),'utf8')).join('\n'));
+JSON.parse(fs.readFileSync(path.join(root,'apps-script','appsscript.json'),'utf8'));
+console.log(`Syntax verified: frontend and ${files.length} Apps Script files.`);
