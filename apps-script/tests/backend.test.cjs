@@ -103,15 +103,16 @@ test('setup/recovery rejects anonymous callers; random temporary admin is log-on
   const u=api.Database.repo('users').all()[0];assert.equal(u.mustChangePassword,true);assert.equal(u.username,'admin');assert.equal(state.logs.some(s=>s.includes('รหัสผ่านชั่วคราว:')),true);assert.equal(api.setupSystem().createdAdmin,false);
 });
 
-test('email password reset sends a one-time token and does not reveal account existence',()=>{
+test('email password reset verifies the registered username and email',()=>{
   const {admin}=seed();
   api.AdminService.saveUser(admin,{userId:admin.userId,username:'admin',displayName:'ผู้ดูแล',role:'admin',classroomIds:[],active:true,email:'admin@example.com'},'request-email');
   const sent=api.PasswordResetService.request({username:'admin',email:'admin@example.com'},'reset-request');
-  assert.equal(sent.requested,true);assert.equal(state.mail.to,'admin@example.com');
+  assert.equal(sent.requested,true);assert.equal(sent.matched,true);assert.equal(state.mail.to,'admin@example.com');
   const token=state.mail.body.match(/\n([a-f0-9]{64})\n/)[1];
   assert.equal(api.PasswordResetService.reset({token,newPassword:'New-secure-pass-12'},'reset-complete').reset,true);
   assert.equal(api.AuthService.login({username:'admin',password:'New-secure-pass-12'},'login-after-reset').user.username,'admin');
-  assert.deepEqual(api.PasswordResetService.request({username:'missing',email:'admin@example.com'},'unknown-reset').requested,true);
+  const missing=api.PasswordResetService.request({username:'missing',email:'admin@example.com'},'unknown-reset');
+  assert.equal(missing.requested,true);assert.equal(missing.matched,false);assert.equal(state.mail.to,'admin@example.com');
 });
 test('student import rejects duplicate IDs before writing any row',()=>{
   const {admin}=seed();api.Database.repo('classrooms').append({classroomId:'m1-1',name:'ม.1/1',active:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});

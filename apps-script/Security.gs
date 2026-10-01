@@ -166,7 +166,8 @@ class PasswordResetService {
         MailApp.sendEmail({ to:email, subject:'รีเซ็ตรหัสผ่านระบบเช็คชื่อ โรงเรียนตากใบ', body:'มีคำขอรีเซ็ตรหัสผ่านบัญชี ' + user.username + '\n\nรหัสรีเซ็ตใช้ครั้งเดียวภายใน 15 นาที:\n' + token + '\n\nหากคุณไม่ได้เป็นผู้ขอ ให้เพิกเฉยต่ออีเมลนี้' });
         AuditLog.write(null, 'request_password_reset', user.userId, null, { emailSent:true }, null, requestId);
       }
-      return { requested:true, message:'หากข้อมูลตรงกับบัญชี ระบบจะส่งรหัสรีเซ็ตไปยังอีเมลที่ลงทะเบียนไว้' };
+      const matched = Boolean(user && registered && registered === email);
+      return { requested:true, matched, message:matched ? 'พบข้อมูลบัญชี ระบบส่งรหัสรีเซ็ตไปยังอีเมลที่ลงทะเบียนไว้แล้ว' : 'ไม่พบชื่อผู้ใช้และอีเมลที่ตรงกัน กรุณาตรวจสอบข้อมูลอีกครั้ง' };
     });
   }
   static reset(payload, requestId) {
