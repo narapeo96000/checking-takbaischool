@@ -45,3 +45,16 @@
   .toast{font-size:14px;line-height:1.6}
 }
 @media print{@page{size:A4;margin:15mm}body{background:white;font-size:10pt;color:#111}.app-shell{display:block}.sidebar,.topbar,.page-actions,.filter-card,.notice,.settings-save-bar,.mobile-backdrop,.toast{display:none!important}.workspace{padding:0;max-width:none}.page-head{margin-bottom:16px}.page-title{font-size:20pt}.page-description{font-size:9pt}.card{box-shadow:none;border-color:#ddd;break-inside:avoid;border-radius:3px;margin-bottom:15px}.card-heading{padding:12px}.stats-grid{gap:8px;grid-template-columns:repeat(5,1fr)}.stat-card{box-shadow:none;padding:10px;min-height:80px;border-radius:3px}.stat-number{font-size:22pt}.stat-foot{font-size:7pt}.stats-grid .stat-card:first-child{grid-row:auto}.stats-grid .stat-card:first-child .stat-number{font-size:22pt;margin:9px 0}.stat-primary .stat-label{flex-direction:row}.overview-banner{background:#fff!important;color:#111;border:1px solid #ddd;padding:14px;min-height:0}.overview-banner p,.overview-label,.overview-rate>span,.overview-rate small{color:#666}.overview-banner h2{font-size:16pt}.overview-rate strong{font-size:25pt}.dashboard-grid{grid-template-columns:1.5fr 1fr}.progress-card{display:block}.progress-ring{height:115px;width:115px}.bar-chart{height:180px}.bar-track{height:120px}.room-grid{grid-template-columns:repeat(3,1fr);padding:0 12px 12px}.room-card{break-inside:avoid}.data-table{font-size:8pt}.data-table th,.data-table td{padding:8px 10px}.data-table td,.data-table th{color:#222!important}.table-wrap{overflow:visible}.data-table thead{display:table-header-group}.data-table tr{break-inside:avoid}.data-table .button,.attendance-controls,.attendance-search,.status-controls,.reason-input,.roster-filter,.login-layout{display:none!important}.badge{border:1px solid #ccc;color:#222;background:#fff;font-size:7pt}.footnote{font-size:7pt}}
+@media (min-width:901px){
+  .sidebar-collapsed .sidebar{overflow:visible}
+  .sidebar-collapsed .sidebar:hover{width:246px;box-shadow:10px 0 28px #0f172a2b}
+  .sidebar-collapsed .sidebar:hover .brand-copy,
+  .sidebar-collapsed .sidebar:hover .nav-item span,
+  .sidebar-collapsed .sidebar:hover .nav-label,
+  .sidebar-collapsed .sidebar:hover .sidebar-footer>p,
+  .sidebar-collapsed .sidebar:hover .sidebar-footer>strong,
+  .sidebar-collapsed .sidebar:hover .sidebar-toggle span{display:block}
+  .sidebar-collapsed .sidebar:hover .nav-item{padding:12px 15px;justify-content:flex-start}
+  .sidebar-collapsed .sidebar:hover .sidebar-footer{padding:20px 12px 0}
+  .sidebar-collapsed .sidebar:hover .sidebar-toggle{margin-top:15px}
+}
