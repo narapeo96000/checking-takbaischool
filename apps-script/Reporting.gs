@@ -35,24 +35,25 @@ class ReportService {
     // are school days. A single-day report still shows the unmarked roster.
     const singleDay = !!payload.date || range.dateFrom === range.requestedDateTo;
     const dates = singleDay && range.dateFrom <= range.dateTo ? [range.dateFrom] : [...recordedDates].sort();
-    const daily = [], byClassroom = selectedRooms.map(room => Object.assign({ classroomId: room.classroomId, classroomName: room.name, advisorId: room.advisorId, advisorName: room.advisorName }, AttendanceService.summary([],0)));
-    const summary = AttendanceService.summary([],0);
+    const weights = SettingsService.all().attendanceWeights;
+    const daily = [], byClassroom = selectedRooms.map(room => Object.assign({ classroomId: room.classroomId, classroomName: room.name, advisorId: room.advisorId, advisorName: room.advisorName }, AttendanceService.summary([],0,weights)));
+    const summary = AttendanceService.summary([],0,weights);
     dates.forEach(date => {
-      const dailySummary = AttendanceService.summary([],0);
+      const dailySummary = AttendanceService.summary([],0,weights);
       selectedRooms.forEach((room,i) => {
         const dayRecords = records.filter(record => record.date === date && record.classroomId === room.classroomId);
         const ids = new Set(selectedStudents.filter(student => student.classroomId === room.classroomId && (!student.createdAt || bangkokDate_(student.createdAt) <= date)).map(student => student.studentId));
         dayRecords.forEach(record => ids.add(record.studentId));
-        const count = AttendanceService.summary(dayRecords, ids.size);
+        const count = AttendanceService.summary(dayRecords, ids.size, weights);
         ['present','absent','late','leave','unmarked','total'].forEach(key => { dailySummary[key] += count[key]; byClassroom[i][key] += count[key]; summary[key] += count[key]; });
       });
-      dailySummary.rate = dailySummary.total ? Math.round((dailySummary.present+dailySummary.late)/dailySummary.total*10000)/100 : 0;
+      dailySummary.rate = dailySummary.total ? Math.round((dailySummary.present * weights.present + dailySummary.leave * weights.leave + dailySummary.late * weights.late + dailySummary.absent * weights.absent) / dailySummary.total * 10000) / 100 : 0;
       daily.push(Object.assign({ date },dailySummary));
     });
-    summary.rate = summary.total ? Math.round((summary.present+summary.late)/summary.total*10000)/100 : 0;
+    summary.rate = summary.total ? Math.round((summary.present * weights.present + summary.leave * weights.leave + summary.late * weights.late + summary.absent * weights.absent) / summary.total * 10000) / 100 : 0;
     summary.dateCount = dates.length;
-    byClassroom.forEach(row => { row.rate = row.total ? Math.round((row.present+row.late)/row.total*10000)/100 : 0; });
-    return { summary, daily, byClassroom, records, classrooms: selectedRooms, range, studentCount: selectedStudents.length, attendanceRateDefinition: '(มา + สาย) / จำนวนรายการที่ควรเช็คชื่อ × 100', denominatorNote: (singleDay ? 'รายวันใช้รายชื่อนักเรียนที่ควรเช็คชื่อ' : 'เฉพาะวันที่มีการบันทึกเช็คชื่อ ไม่ใช่ปฏิทินวันเรียน') + '; ใช้รายชื่อนักเรียนปัจจุบันที่เปิดใช้งานและสร้างแล้ว ณ วันนั้น รวมรายการเช็คชื่อย้อนหลังที่มีอยู่' };
+    byClassroom.forEach(row => { row.rate = row.total ? Math.round((row.present * weights.present + row.leave * weights.leave + row.late * weights.late + row.absent * weights.absent) / row.total * 10000) / 100 : 0; });
+    return { summary, daily, byClassroom, records, classrooms: selectedRooms, range, studentCount: selectedStudents.length, attendanceWeights: weights, attendanceRateDefinition: `(มา × ${weights.present}) + (ลา × ${weights.leave}) + (สาย × ${weights.late}) + (ขาด × ${weights.absent}) หารด้วยจำนวนรายการที่ควรเช็คชื่อ × 100`, denominatorNote: (singleDay ? 'รายวันใช้รายชื่อนักเรียนที่ควรเช็คชื่อ' : 'เฉพาะวันที่มีการบันทึกเช็คชื่อ ไม่ใช่ปฏิทินวันเรียน') + '; ใช้รายชื่อนักเรียนปัจจุบันที่เปิดใช้งานและสร้างแล้ว ณ วันนั้น รวมรายการเช็คชื่อย้อนหลังที่มีอยู่' };
   }
   static exportPdf(actor, payload, requestId) {
     const report = this.statistics(actor,payload), settings = SettingsService.publicSettings();

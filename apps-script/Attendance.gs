@@ -2,11 +2,13 @@ class AttendanceService {
   static batch(date, classroomId) {
     return Database.repo('attendance_batches').find('batchId', date + ':' + classroomId) || { batchId: date + ':' + classroomId, date, classroomId, revision: 0, updatedAt: '', updatedBy: '' };
   }
-  static summary(records, total) {
+  static summary(records, total, configuredWeights) {
     const result = { present: 0, absent: 0, late: 0, leave: 0, unmarked: 0, total: total || 0, rate: 0 };
     records.forEach(record => { if (APP_CONFIG.statuses.includes(record.status)) result[record.status]++; });
     result.unmarked = Math.max(0, result.total - result.present - result.absent - result.late - result.leave);
-    result.rate = result.total ? Math.round((result.present + result.late) / result.total * 10000) / 100 : 0;
+    const weights = Object.assign({ present: 1, leave: 0.5, late: 0.25, absent: 0 }, configuredWeights || SettingsService.all().attendanceWeights || {});
+    const score = result.present * Number(weights.present) + result.leave * Number(weights.leave) + result.late * Number(weights.late) + result.absent * Number(weights.absent);
+    result.rate = result.total ? Math.round(score / result.total * 10000) / 100 : 0;
     return result;
   }
   static get(actor, payload) {

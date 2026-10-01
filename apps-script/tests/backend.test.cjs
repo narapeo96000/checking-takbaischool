@@ -173,7 +173,7 @@ test('mutations dedupe retry, preserve reasons, reject stale revisions, retain c
   assert.throws(()=>api.AttendanceService.mutate(teacher,mutation([{studentId:'00001',status:'late',reason:''}]),'r3',false),e=>e.code==='CONFLICT'&&e.details.revision===1);
   assert.throws(()=>api.AttendanceService.mutate(teacher,{...p,records:[{studentId:'00001',status:'absent'}]},'reuse',false),e=>e.code==='CONFLICT');
   const update=mutation([{studentId:'00001',status:'late',reason:'รถเสีย'}],{baseRevision:1,location:{latitude:6.26,longitude:102.05,accuracy:15,capturedAt:new Date().toISOString()},locationError:''});assert.equal(api.AttendanceService.mutate(teacher,update,'r4',false).revision,2);
-  const current=api.AttendanceService.get(teacher,{date,classroomId:'A'});assert.equal(current.records.find(r=>r.studentId==='00001').reason,'รถเสีย');assert.equal(current.summary.rate,100);
+  const current=api.AttendanceService.get(teacher,{date,classroomId:'A'});assert.equal(current.records.find(r=>r.studentId==='00001').reason,'รถเสีย');assert.equal(current.summary.rate,62.5);
   const clear={...mutation([]),baseRevision:2};assert.equal(api.AttendanceService.mutate(teacher,clear,'clear',true).revision,3);assert.equal(api.Database.repo('attendance').all().length,0);assert.equal(api.AttendanceService.get(teacher,{date,classroomId:'A'}).summary.unmarked,2);
   assert.equal(JSON.parse(api.Database.repo('logs').all().find(l=>l.action==='clear_attendance').beforeJson).length,2);
 });

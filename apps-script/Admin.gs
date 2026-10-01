@@ -28,6 +28,17 @@ class SettingsService {
       if (next.chatbotUrl) NotificationService.validateWebhook(next.chatbotUrl);
       ['primaryColor','secondaryColor'].forEach(key => { if (Object.prototype.hasOwnProperty.call(payload, key)) { if (!/^#[a-f0-9]{6}$/i.test(payload[key])) throw new AppError('VALIDATION', 'สีต้องอยู่ในรูปแบบ #RRGGBB'); next[key] = payload[key]; } });
       if (Object.prototype.hasOwnProperty.call(payload, 'reportTime')) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(payload.reportTime)) throw new AppError('VALIDATION', 'เวลารายงานต้องอยู่ในรูปแบบ HH:mm'); next.reportTime = payload.reportTime; }
+      if (Object.prototype.hasOwnProperty.call(payload, 'attendanceWeights')) {
+        const input = payload.attendanceWeights;
+        if (!input || typeof input !== 'object') throw new AppError('VALIDATION', 'กำหนดค่าน้ำหนักสถิติไม่ถูกต้อง');
+        const weights = {};
+        ['present','leave','late','absent'].forEach(key => {
+          const value = Number(input[key]);
+          if (!Number.isFinite(value) || value < 0 || value > 1) throw new AppError('VALIDATION', 'ค่าน้ำหนักสถิติต้องอยู่ระหว่าง 0 ถึง 1');
+          weights[key] = Math.round(value * 100) / 100;
+        });
+        next.attendanceWeights = weights;
+      }
       if (Object.prototype.hasOwnProperty.call(payload, 'deputyDirectors')) {
         if (!Array.isArray(payload.deputyDirectors) || payload.deputyDirectors.length > 3) throw new AppError('VALIDATION', 'ระบุรองผู้อำนวยการได้ไม่เกิน 3 คน');
         next.deputyDirectors = payload.deputyDirectors.map(name => Validation.text(name, 250)).filter(Boolean);

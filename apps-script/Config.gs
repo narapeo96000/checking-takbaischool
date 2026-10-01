@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   schoolName: 'โรงเรียนตากใบ', affiliation: '', address: '', email: '', website: '',
   logoUrl: '', director: '', deputyDirectors: [], reportTime: '08:10',
   primaryColor: '#b91c1c', secondaryColor: '#2563eb',
+  attendanceWeights: { present: 1, leave: 0.5, late: 0.25, absent: 0 },
   dailyReportEnabled: false, lineEnabled: false, lineTargetId: '',
   telegramEnabled: false, telegramChatId: '', chatbotEnabled: false, chatbotUrl: ''
 });
