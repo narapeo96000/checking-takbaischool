@@ -27,7 +27,7 @@ const SHEET_SCHEMAS = Object.freeze({
 const DEFAULT_SETTINGS = Object.freeze({
   schoolName: 'โรงเรียนตากใบ', affiliation: '', address: '', email: '', website: '',
   logoUrl: '', director: '', deputyDirectors: [], reportTime: '08:10',
-  primaryColor: '#0f766e', secondaryColor: '#f59e0b',
+  primaryColor: '#a5262c', secondaryColor: '#795548',
   dailyReportEnabled: false, lineEnabled: false, lineTargetId: '',
   telegramEnabled: false, telegramChatId: '', chatbotEnabled: false, chatbotUrl: ''
 });
