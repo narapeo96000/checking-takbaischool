@@ -66,3 +66,6 @@
 
 /* Clear status colors for attendance actions */
 .status-button-present{color:#1c7955;background:#f0fbf5;border-color:#9bd7bb}.status-button-absent{color:#ae5140;background:#fff4f2;border-color:#e7aaa0}.status-button-late{color:#846313;background:#fff9e8;border-color:#e8cf83}.status-button-leave{color:#39758c;background:#f0f8fb;border-color:#a6cfdb}.status-button-present:hover,.status-button-absent:hover,.status-button-late:hover,.status-button-leave:hover{filter:brightness(.97)}
+
+/* Clear status colors in overview statistics */
+.stat-card.stat-present{border-top:4px solid #1c7955;background:#f0fbf5}.stat-card.stat-absent{border-top:4px solid #ae5140;background:#fff4f2}.stat-card.stat-late{border-top:4px solid #d2a52b;background:#fff9e8}.stat-card.stat-leave{border-top:4px solid #39758c;background:#f0f8fb}.stat-card.stat-present .stat-number{color:#1c7955}.stat-card.stat-absent .stat-number{color:#ae5140}.stat-card.stat-late .stat-number{color:#846313}.stat-card.stat-leave .stat-number{color:#39758c}
