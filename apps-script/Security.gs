@@ -163,7 +163,8 @@ class PasswordResetService {
         resetRepo.all().filter(row => row.userId === user.userId && !row.usedAt).forEach(row => { row.usedAt = nowIso_(); resetRepo.update(row); });
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
         resetRepo.append({ resetId:uuid_(), userId:user.userId, tokenHash:PasswordCrypto.hash(token), expiresAt, usedAt:'', createdAt:nowIso_(), requestEmail:email });
-        MailApp.sendEmail({ to:email, subject:'รีเซ็ตรหัสผ่านระบบเช็คชื่อ โรงเรียนตากใบ', body:'มีคำขอรีเซ็ตรหัสผ่านบัญชี ' + user.username + '\n\nรหัสรีเซ็ตใช้ครั้งเดียวภายใน 15 นาที:\n' + token + '\n\nหากคุณไม่ได้เป็นผู้ขอ ให้เพิกเฉยต่ออีเมลนี้' });
+        const resetUrl = APP_CONFIG.frontendUrl + '?reset=' + encodeURIComponent(token);
+        MailApp.sendEmail({ to:email, subject:'รีเซ็ตรหัสผ่านระบบเช็คชื่อ โรงเรียนตากใบ', body:'มีคำขอรีเซ็ตรหัสผ่านบัญชี ' + user.username + '\n\nกดลิงก์นี้เพื่อตั้งรหัสผ่านใหม่ (ใช้ได้ 15 นาที):\n' + resetUrl + '\n\nหากเปิดลิงก์ไม่ได้ ใช้รหัสรีเซ็ตนี้แทน:\n' + token + '\n\nหากคุณไม่ได้เป็นผู้ขอ ให้เพิกเฉยต่ออีเมลนี้' });
         AuditLog.write(null, 'request_password_reset', user.userId, null, { emailSent:true }, null, requestId);
       }
       const matched = Boolean(user && registered && registered === email);
