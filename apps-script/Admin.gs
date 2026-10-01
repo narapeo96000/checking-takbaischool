@@ -107,6 +107,30 @@ class AdminService {
       return SheetRepository.clean(student);
     });
   }
+  static importStudents(actor, payload, requestId) {
+    Authorization.admin(actor);
+    return withLock_(() => {
+      const rows = Array.isArray(payload.rows) ? payload.rows : [];
+      if (!rows.length || rows.length > 1000) throw new AppError('VALIDATION', 'ไฟล์ต้องมีข้อมูลนักเรียน 1–1,000 รายการ');
+      const repo = Database.repo('students'), classrooms = Database.repo('classrooms').all();
+      const existing = new Set(repo.all().map(item => String(item.studentId)));
+      const incoming = new Set(), prepared = [], duplicates = [];
+      rows.forEach((row, index) => {
+        const line = index + 2, studentId = Validation.id(row.studentId, `เลขประจำตัวแถว ${line}`);
+        if (incoming.has(studentId) || existing.has(studentId)) duplicates.push(studentId);
+        incoming.add(studentId);
+        const classroomId = Validation.id(row.classroomId, `ห้องเรียนแถว ${line}`);
+        if (!classrooms.some(item => item.classroomId === classroomId)) throw new AppError('VALIDATION', `ไม่พบห้องเรียน ${classroomId} ที่แถว ${line}`);
+        const number = Number(row.number || 0);
+        if (!Number.isInteger(number) || number < 0 || number > 999) throw new AppError('VALIDATION', `เลขที่ไม่ถูกต้องที่แถว ${line}`);
+        prepared.push({ studentId, prefix: Validation.text(row.prefix, 30), firstName: Validation.required(row.firstName, `ชื่อนักเรียนแถว ${line}`, 200), lastName: Validation.required(row.lastName, `นามสกุลนักเรียนแถว ${line}`, 200), classroomId, number, active: row.active === false || String(row.active).toLowerCase() === 'false' ? false : true, createdAt: nowIso_(), updatedAt: nowIso_() });
+      });
+      if (duplicates.length) throw new AppError('CONFLICT', `พบเลขประจำตัวซ้ำ: ${[...new Set(duplicates)].slice(0, 20).join(', ')}`);
+      repo.appendMany(prepared);
+      AuditLog.write(actor, 'import_students', requestId, null, { count: prepared.length, studentIds: prepared.map(item => item.studentId) }, null, requestId);
+      return { imported: prepared.length, skipped: 0 };
+    });
+  }
   static saveClassroom(actor, payload, requestId) {
     Authorization.admin(actor);
     return withLock_(() => {

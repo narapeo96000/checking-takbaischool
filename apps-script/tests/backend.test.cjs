@@ -107,6 +107,14 @@ test('email password reset sends a one-time token and does not reveal account ex
   assert.equal(api.AuthService.login({username:'admin',password:'New-secure-pass-12'},'login-after-reset').user.username,'admin');
   assert.deepEqual(api.PasswordResetService.request({username:'missing',email:'admin@example.com'},'unknown-reset').requested,true);
 });
+test('student import rejects duplicate IDs before writing any row',()=>{
+  const {admin}=seed();api.Database.repo('classrooms').append({classroomId:'m1-1',name:'ม.1/1',active:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  const before=api.Database.repo('students').all().length;
+  assert.throws(()=>api.AdminService.importStudents(admin,{rows:[{studentId:'00001',firstName:'หนึ่ง',lastName:'ทดสอบ',classroomId:'m1-1',number:1},{studentId:'00001',firstName:'สอง',lastName:'ทดสอบ',classroomId:'m1-1',number:2}]},'import-duplicate'),e=>e.code==='CONFLICT');
+  assert.equal(api.Database.repo('students').all().length,before);
+  const result=api.AdminService.importStudents(admin,{rows:[{studentId:'90001',firstName:'หนึ่ง',lastName:'ทดสอบ',classroomId:'m1-1',number:1}]},'import-ok');
+  assert.equal(result.imported,1);
+});
 
 test('public/domain database sharing blocks setup before sheets or credentials are created',()=>{
   state.sheets.clear();api.Database.instance=null;

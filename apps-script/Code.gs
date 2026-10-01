@@ -33,6 +33,7 @@ function dispatch(request) {
       case 'listUsers': result = AdminService.users(actor); break;
       case 'saveUser': result = AdminService.saveUser(actor,payload,requestId); break;
       case 'saveStudent': result = AdminService.saveStudent(actor,payload,requestId); break;
+      case 'importStudents': result = AdminService.importStudents(actor,payload,requestId); break;
       case 'saveClassroom': result = AdminService.saveClassroom(actor,payload,requestId); break;
       case 'exportPdf': result = ReportService.exportPdf(actor,payload,requestId); break;
       case 'getLogs': result = AdminService.logs(actor,payload); break;
