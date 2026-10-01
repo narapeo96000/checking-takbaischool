@@ -62,3 +62,4 @@
 }
 /* Centered SweetAlert status popup */
 .swal-status-popup{border-top:5px solid var(--primary)!important;min-width:320px!important;padding:28px 25px!important}.swal-status-popup .swal2-icon{margin:0 auto 15px!important}.swal-status-popup .swal2-title{margin:0!important}
+.login-options{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:2px 0 16px}.check-option{display:flex;align-items:center;gap:8px;color:#64748b;font-size:11px;cursor:pointer}.check-option input{width:17px;height:17px;accent-color:var(--primary);cursor:pointer}.check-option span{line-height:1.6}
