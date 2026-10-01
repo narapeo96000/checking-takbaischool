@@ -136,7 +136,14 @@ export class AttendanceApp {
   async modal(options){if(window.Swal)return Swal.fire({confirmButtonText:'ยืนยัน',cancelButtonText:'ยกเลิก',showCancelButton:true,confirmButtonColor:this.state.settings.secondaryColor,...options});if(options.input){const value=window.prompt(`${options.title}\n${options.inputLabel||''}`,options.inputValue||'');return {isConfirmed:value!==null,value};}return {isConfirmed:window.confirm(`${options.title}\n${options.text||''}`)};}
   async formModal(title,fields,values={},cancel=true){const html=`<form id="modal-form" class="modal-form">${fields.map(field=>`<label class="field"><span>${e(field.label)}</span>${field.options?`<select name="${e(field.name)}" ${field.required?'required':''}>${field.options.map(option=>`<option value="${e(option.value)}" ${String(values[field.name]??'')===String(option.value)?'selected':''}>${e(option.label)}</option>`).join('')}</select>`:`<input name="${e(field.name)}" type="${field.type||'text'}" value="${e(values[field.name]||'')}" ${field.required?'required':''} ${field.readonly?'readonly':''} ${field.minlength?`minlength="${field.minlength}"`:''} ${field.min?`min="${field.min}"`:''} autocomplete="${field.type==='password'?'new-password':'off'}">`}</label>`).join('')}</form>`;
     if(!window.Swal)throw new Error('เปิดแบบฟอร์มไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วโหลดหน้าใหม่');const result=await this.modal({title,html,showCancelButton:cancel,allowOutsideClick:cancel,allowEscapeKey:cancel,preConfirm:()=>{const form=document.getElementById('modal-form');if(!form.reportValidity())return false;return Object.fromEntries(new FormData(form));}});return result.isConfirmed?result.value:null;}
-  toast(message,type='success'){const el=document.getElementById('toast');el.textContent=message;el.className=`toast visible ${type}`;clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.remove('visible'),6000);}
+  toast(message,type='success'){
+    if(window.Swal){
+      const Toast=Swal.mixin({toast:true,position:'top-end',showConfirmButton:false,timer:type==='error'?5000:3500,timerProgressBar:true,customClass:{popup:'swal-status-toast'}});
+      Toast.fire({icon:type==='error'?'error':type==='info'?'info':'success',title:message});
+      return;
+    }
+    const el=document.getElementById('toast');el.textContent=message;el.className=`toast visible ${type}`;clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.remove('visible'),6000);
+  }
   async error(error){this.toast(error.message||'เกิดข้อผิดพลาด','error');if(['UNAUTHORIZED','SESSION_EXPIRED','AUTH_REQUIRED'].includes(error.code)){if(this.api)this.api.token='';this.state.user=null;this.state.route='login';this.render();}}
 }
 
