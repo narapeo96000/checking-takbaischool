@@ -118,7 +118,7 @@ export class AttendanceApp {
       this.state.saveState='offline';this.toast(error.message,'error');
       if(error.code==='CONFLICT')await this.resolveConflict();
       else if(['FORBIDDEN','VALIDATION','NOT_FOUND'].includes(error.code))await this.reviewRejectedDraft(error);
-      if(['UNAUTHORIZED','SESSION_EXPIRED','AUTH_REQUIRED'].includes(error.code)){this.state.user=null;this.state.route='login';this.render();}
+      if(['UNAUTHORIZED','SESSION_EXPIRED','AUTH_REQUIRED'].includes(error.code) && !(this.state.route==='dashboard'&&!this.state.user)){this.state.user=null;this.state.route='login';this.render();}
     }finally{
       this.syncing=false;if(sameSession())this.updateSaveState();
       else if(this.queue&&this.state.user)queueMicrotask(()=>this.sync());
@@ -185,7 +185,7 @@ export class AttendanceApp {
     }
     const el=document.getElementById('toast');el.textContent=message;el.className=`toast visible ${type}`;clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.classList.remove('visible'),6000);
   }
-  async error(error){this.toast(error.message||'เกิดข้อผิดพลาด','error');if(['UNAUTHORIZED','SESSION_EXPIRED','AUTH_REQUIRED'].includes(error.code)){if(this.api)this.api.token='';this.state.user=null;this.state.route='login';this.render();}}
+  async error(error){this.toast(error.message||'เกิดข้อผิดพลาด','error');if(['UNAUTHORIZED','SESSION_EXPIRED','AUTH_REQUIRED'].includes(error.code)){if(this.api)this.api.token='';this.state.user=null;if(this.state.route!=='dashboard')this.state.route='login';this.render();}}
 }
 
 if(typeof document!=='undefined')new AttendanceApp().start();
