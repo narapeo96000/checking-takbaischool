@@ -104,10 +104,49 @@ const sections = [
 ];
 
 /** Public manual: no sign-in required, no account or credential values rendered. */
+// Search only local guide text; highlighted words are inserted as text nodes.
+export class GuideSearch {
+  constructor(root){
+    this.root=root;
+    this.sections=[...root.querySelectorAll('.guide-section')];
+    this.items=[...root.querySelectorAll('.guide-toc li')];
+    this.detailsBeforeSearch=null;
+  }
+  apply(value=''){
+    const query=String(value).trim().slice(0,200);
+    const terms=[...new Set(query.toLocaleLowerCase('th').split(/\s+/u).filter(Boolean))];
+    if(terms.length&&!this.detailsBeforeSearch)this.detailsBeforeSearch=new Map([...this.root.querySelectorAll('.guide-section details')].map(node=>[node,node.open]));
+    for(const mark of this.root.querySelectorAll('mark.guide-highlight')){const parent=mark.parentNode;mark.replaceWith(document.createTextNode(mark.textContent));parent.normalize();}
+    const pattern=terms.length?new RegExp(terms.sort((a,b)=>b.length-a.length).map(term=>term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'giu'):null;
+    let count=0;
+    for(const section of this.sections){
+      const text=section.textContent.toLocaleLowerCase('th');
+      const matches=terms.every(term=>text.includes(term));section.hidden=!matches;
+      const item=this.items.find(item=>item.querySelector('[data-target]')?.dataset.target===section.id);if(item)item.hidden=!matches;
+      if(matches){count++;if(pattern){this.highlight(section,pattern);if(item)this.highlight(item,pattern);}}
+    }
+    for(const [node,opened] of this.detailsBeforeSearch||[])node.open=terms.length?(!!node.querySelector('mark.guide-highlight')||opened):opened;
+    if(!terms.length)this.detailsBeforeSearch=null;
+    const status=this.root.querySelector('#guide-search-results');if(status)status.textContent=terms.length?`พบ ${count} จาก ${this.sections.length} หัวข้อ`:`แสดงทั้งหมด ${this.sections.length} หัวข้อ`;
+    const empty=this.root.querySelector('#guide-search-empty');if(empty)empty.hidden=count>0;
+    return count;
+  }
+  highlight(element,pattern){
+    const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    for(const node of nodes){
+      const text=node.nodeValue;pattern.lastIndex=0;const matches=[...text.matchAll(pattern)];if(!matches.length)continue;
+      const fragment=document.createDocumentFragment();let start=0;
+      for(const match of matches){fragment.append(document.createTextNode(text.slice(start,match.index)));const mark=document.createElement('mark');mark.className='guide-highlight';mark.textContent=match[0];fragment.append(mark);start=match.index+match[0].length;}
+      fragment.append(document.createTextNode(text.slice(start)));node.replaceWith(fragment);
+    }
+  }
+}
+
 export function renderUserGuide(state = {}) {
   const school = state.settings?.schoolName || 'โรงเรียน';
   return `<div class="page-head" id="guide-top"><div><div class="eyebrow">สำหรับครูที่ปรึกษาและผู้ดูแลระบบ</div><h1 class="page-title">คู่มือการใช้งาน</h1><p class="page-description">${h(school)} · เช็คชื่อจากมือถือ อ่านรายงาน และตรวจสอบการบันทึกให้ครบ</p></div><div class="page-actions"><button type="button" class="button button-secondary" data-action="print-guide">${icon('download')}<span>พิมพ์ / บันทึกคู่มือ PDF</span></button></div></div>
     ${connectionStatus(state)}
+    <section class="card guide-search-panel" aria-label="ค้นหาในคู่มือ"><label class="field" for="guide-search"><span>ค้นหาในคู่มือการใช้งาน</span><div class="input-with-icon">${icon('search')}<input id="guide-search" type="search" value="${h(state.guideSearch || '')}" maxlength="200" placeholder="เช่น เช็คชื่อ รหัสผ่าน PDF" aria-describedby="guide-search-results" autocomplete="off"></div></label><button type="button" class="button button-secondary" data-action="clear-guide-search">${icon('x')}ล้างคำค้น</button><p id="guide-search-results" role="status" aria-live="polite">แสดงทั้งหมด ${sections.length} หัวข้อ</p></section>
     <div class="guide-layout"><nav class="card guide-toc" aria-label="สารบัญคู่มือ"><h2>สารบัญ</h2><ol>${sections.map(section => `<li><a href="#${h(section.id)}" data-action="guide-anchor" data-target="${h(section.id)}">${h(section.title)}</a></li>`).join('')}</ol><p class="muted">อ่านได้ก่อนเข้าสู่ระบบ</p></nav>
-    <div class="guide-content">${sections.map((section, index) => `<section class="card guide-section" id="${h(section.id)}" aria-labelledby="${h(section.id)}-title"><div class="card-heading"><h2 id="${h(section.id)}-title">${icon(section.name)}<span>${index + 1}. ${h(section.title)}</span></h2></div>${section.body}</section>`).join('')}<a class="button button-text" href="#guide-top" data-action="guide-anchor" data-target="guide-top">${icon('arrow-up')}กลับขึ้นบน</a></div></div>`;
+    <div class="guide-content"><div id="guide-search-empty" class="card guide-search-empty" hidden><h2>ไม่พบข้อมูลในคู่มือ</h2><p>ลองใช้คำสั้นลง เช่น “เช็คชื่อ” หรือ “รหัสผ่าน” หรือล้างคำค้นเพื่อดูทั้งหมด</p><button type="button" class="button button-secondary" data-action="clear-guide-search">ล้างคำค้น</button></div>${sections.map((section, index) => `<section class="card guide-section" id="${h(section.id)}" aria-labelledby="${h(section.id)}-title"><div class="card-heading"><h2 id="${h(section.id)}-title">${icon(section.name)}<span>${index + 1}. ${h(section.title)}</span></h2></div>${section.body}</section>`).join('')}<a class="button button-text" href="#guide-top" data-action="guide-anchor" data-target="guide-top">${icon('arrow-up')}กลับขึ้นบน</a></div></div>`;
 }
