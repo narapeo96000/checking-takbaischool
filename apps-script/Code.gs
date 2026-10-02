@@ -34,6 +34,7 @@ function dispatch(request) {
       case 'getSettings': result = SettingsService.get(actor); break;
       case 'saveSettings': result = SettingsService.save(actor,payload,requestId); break;
       case 'listUsers': result = AdminService.users(actor); break;
+      case 'adminResetPassword': result = AdminService.resetUserPassword(actor,payload,requestId); break;
       case 'saveUser': result = AdminService.saveUser(actor,payload,requestId); break;
       case 'saveStudent': result = AdminService.saveStudent(actor,payload,requestId); break;
       case 'importStudents': result = AdminService.importStudents(actor,payload,requestId); break;

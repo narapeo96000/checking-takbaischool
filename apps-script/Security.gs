@@ -155,6 +155,10 @@ class UserEmailService {
 }
 
 class PasswordResetService {
+  static invalidate(userId) {
+    const repo = Database.repo('password_resets');
+    repo.all().filter(row => row.userId === userId && !row.usedAt).forEach(row => { row.usedAt = nowIso_(); repo.update(row); });
+  }
   static request(payload, requestId) {
     const username = String(payload.username || '').trim().toLowerCase();
     const email = String(payload.email || '').trim().toLowerCase();
@@ -165,7 +169,7 @@ class PasswordResetService {
       if (user && registered && registered === email) {
         const token = uuid_().replace(/-/g,'') + uuid_().replace(/-/g,'');
         const resetRepo = Database.repo('password_resets');
-        resetRepo.all().filter(row => row.userId === user.userId && !row.usedAt).forEach(row => { row.usedAt = nowIso_(); resetRepo.update(row); });
+        this.invalidate(user.userId);
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
         resetRepo.append({ resetId:uuid_(), userId:user.userId, tokenHash:PasswordCrypto.hash(token), expiresAt, usedAt:'', createdAt:nowIso_(), requestEmail:email });
         const resetUrl = APP_CONFIG.frontendUrl + '?reset=' + encodeURIComponent(token);

@@ -272,3 +272,30 @@ test('teacher without assigned classrooms can read roster but cannot record atte
   assert.equal(api.dispatch({action:'listClassrooms',token:auth.token,payload:{scope:'roster'}}).data.every(room=>!room.canCheckAttendance),true);
   assert.equal(api.dispatch({action:'saveAttendance',token:auth.token,payload:mutation([{studentId:'00001',status:'present'}])}).error.code,'FORBIDDEN');
 });
+
+test('admin password reset works for every account, revokes target sessions/links, and preserves role/status',()=>{
+  const {admin,teacher}=seed();const adminLogin=login('admin'),teacherLogin=login();api.UserEmailService.save(teacher.userId,'teacher@example.com',admin.userId);
+  api.PasswordResetService.request({username:'teacher.a',email:'teacher@example.com'},'email-before-admin-reset');const oldToken=state.mail.body.match(/\n([a-f0-9]{64})\n/)[1];
+  const result=api.dispatch({action:'adminResetPassword',token:adminLogin.token,payload:{userId:teacher.userId,newPassword:'01234567'},requestId:'admin-reset'});assert.equal(result.ok,true);assert.equal(result.data.reset,true);assert.equal(result.data.mustChangePassword,true);assert.ok(!JSON.stringify(result).includes('01234567'));
+  const updated=api.Database.repo('users').find('userId',teacher.userId);assert.equal(updated.password,'01234567');assert.equal(updated.role,'advisor');assert.equal(updated.active,true);assert.equal(api.UserEmailService.get(teacher.userId),'teacher@example.com');
+  assert.throws(()=>api.AuthService.authenticate(teacherLogin.token,true),e=>e.code==='UNAUTHORIZED');assert.equal(api.AuthService.authenticate(adminLogin.token,true).userId,admin.userId);
+  assert.throws(()=>api.PasswordResetService.reset({token:oldToken,newPassword:'88888888'},'stale-email'),e=>e.code==='VALIDATION');
+  assert.equal(api.AuthService.login({username:'teacher.a',password:'01234567'},'login-reset').mustChangePassword,true);assert.ok(!JSON.stringify(api.Database.repo('logs').all()).includes('01234567'));
+  assert.equal(api.dispatch({action:'adminResetPassword',token:adminLogin.token,payload:{userId:'missing',newPassword:'88888888'}}).error.code,'NOT_FOUND');
+  updated.active=false;api.Database.repo('users').update(updated);api.AdminService.resetUserPassword(admin,{userId:teacher.userId,newPassword:'88888888'},'reset-inactive');assert.equal(api.Database.repo('users').find('userId',teacher.userId).active,false);
+  const self=api.dispatch({action:'adminResetPassword',token:adminLogin.token,payload:{userId:admin.userId,newPassword:'99999999'}});assert.equal(self.ok,true);assert.equal(api.Database.repo('users').find('userId',admin.userId).role,'admin');assert.throws(()=>api.AuthService.authenticate(adminLogin.token,true),e=>e.code==='UNAUTHORIZED');
+});
+test('teachers and anonymous callers cannot use admin password reset; short password makes no writes',()=>{
+  const {admin,teacher}=seed();const auth=login(),adminAuth=login('admin');const before=JSON.stringify(api.Database.repo('users').all());
+  assert.equal(api.dispatch({action:'adminResetPassword',token:auth.token,payload:{userId:admin.userId,newPassword:'12345678'}}).error.code,'FORBIDDEN');
+  assert.equal(api.dispatch({action:'adminResetPassword',payload:{userId:teacher.userId,newPassword:'12345678'}}).error.code,'UNAUTHORIZED');
+  assert.equal(api.dispatch({action:'adminResetPassword',token:adminAuth.token,payload:{userId:teacher.userId,newPassword:'1234'}}).error.code,'VALIDATION');assert.equal(JSON.stringify(api.Database.repo('users').all()),before);
+});
+test('email reset requires exact registered pair; links expire at 15 minutes and can be used once',()=>{
+  const {admin,teacher}=seed();api.UserEmailService.save(teacher.userId,'teacher@example.com',admin.userId);
+  for(const payload of [{username:'teacher.a',email:'other@example.com'},{username:'missing',email:'teacher@example.com'}]){state.mail=null;const r=api.PasswordResetService.request(payload,'mismatch');assert.equal(r.matched,false);assert.equal(state.mail,null);assert.equal(api.Database.repo('password_resets').all().length,0);}
+  const loginBefore=login();api.PasswordResetService.request({username:'teacher.a',email:'teacher@example.com'},'valid');const token=state.mail.body.match(/\n([a-f0-9]{64})\n/)[1];const row=api.Database.repo('password_resets').all()[0];const lifetime=new Date(row.expiresAt)-Date.now();assert.ok(lifetime>899000&&lifetime<=900000);assert.ok(state.mail.body.includes('?reset='+token));
+  api.PasswordResetService.reset({token,newPassword:'00001111'},'complete');assert.throws(()=>api.PasswordResetService.reset({token,newPassword:'22223333'},'reuse'),e=>e.code==='VALIDATION');assert.throws(()=>api.AuthService.authenticate(loginBefore.token,true),e=>e.code==='UNAUTHORIZED');assert.equal(api.AuthService.login({username:'teacher.a',password:'00001111'},'new-login').mustChangePassword,false);
+  api.PasswordResetService.request({username:'teacher.a',email:'teacher@example.com'},'expired');const expiredToken=state.mail.body.match(/\n([a-f0-9]{64})\n/)[1];const expiring=api.Database.repo('password_resets').all().find(r=>!r.usedAt);expiring.expiresAt=new Date(Date.now()-1).toISOString();api.Database.repo('password_resets').update(expiring);
+  assert.throws(()=>api.PasswordResetService.reset({token:expiredToken,newPassword:'44445555'},'late'),e=>e.code==='VALIDATION');assert.equal(api.Database.repo('users').find('userId',teacher.userId).password,'00001111');
+});

@@ -41,6 +41,7 @@ export class DemoApi {
     case 'listUsers':return [this.user];
     case 'saveStudent':{let s=this.students.find(s=>s.id===p.id);if(s)Object.assign(s,p);else {s={...p,id:uuid()};this.students.push(s);}const room=this.classrooms.find(r=>r.id===s.classroomId);Object.assign(s,{classroomName:room?.name,advisorId:room?.advisorId,advisorName:room?.advisorName});return s;}
     case 'saveClassroom':{let r=this.classrooms.find(r=>r.id===p.id);if(r)Object.assign(r,p);else {r={...p,id:uuid()};this.classrooms.push(r);}return r;}
+    case 'adminResetPassword':return {reset:true,userId:p.userId,mustChangePassword:true};
     case 'saveUser':return p;
     case 'getLogs':return this.rows.map((r,i)=>({...r,id:i,actorName:'ผู้ดูแลระบบตัวอย่าง',action:'saveAttendance'}));
     case 'changePassword':return {success:true};

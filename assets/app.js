@@ -1,6 +1,6 @@
-import {Views} from './views.js?v=classroom-roster-20261002';
-import {renderUserGuide} from './manual.js?v=password8-20261002';
-import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=reference-theme-20261001';
+import {Views} from './views.js?v=password-reset-admin-20261002';
+import {renderUserGuide} from './manual.js?v=password-reset-admin-20261002';
+import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=password-reset-admin-20261002';
 import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl} from './core.js';
 
 export class AttendanceApp {
@@ -17,7 +17,7 @@ export class AttendanceApp {
     window.addEventListener('online',()=>this.sync());
     window.addEventListener('beforeunload',event=>{if(this.queue?.items.length){event.preventDefault();event.returnValue='';}});
   }
-  async start(){this.render();this.captureLocation(false);const requested=location.hash.slice(1),resetToken=new URLSearchParams(location.search).get('reset');if(requested==='guide'||requested.startsWith('guide-')){await this.navigate('guide');if(requested!=='guide')document.getElementById(requested)?.scrollIntoView({block:'start'});}else if(requested==='login'){await this.navigate('login');}let url=window.CHECKING_CONFIG?.apiUrl||localStorage.getItem('checking:apiUrl');if(url){const finish=this.beginActivity('กำลังเชื่อมต่อระบบ…');try{await this.connect(url);if(!requested||requested==='dashboard')await this.navigate('dashboard');if(resetToken)await this.resetFromLink(resetToken);}catch(error){this.toast(error.message,'error');}finally{finish();}}}
+  async start(){this.render();this.captureLocation(false);const requested=location.hash.slice(1),resetToken=new URLSearchParams(location.search).get('reset');if(requested==='guide'||requested.startsWith('guide-')){await this.navigate('guide');if(requested!=='guide')document.getElementById(requested)?.scrollIntoView({block:'start'});}else if(requested==='login'||resetToken){await this.navigate('login');}let url=window.CHECKING_CONFIG?.apiUrl||localStorage.getItem('checking:apiUrl');if(url){const finish=this.beginActivity('กำลังเชื่อมต่อระบบ…');try{await this.connect(url);if(!resetToken&&(!requested||requested==='dashboard'))await this.navigate('dashboard');if(resetToken)await this.resetFromLink(resetToken);}catch(error){this.toast(error.message,'error');}finally{finish();}}}
   async connect(url){const normalized=validateApiUrl(url);this.api?.dispose();this.invalidateCache();this.dataPending.clear();this.api=new AppsScriptApi(normalized);this.state.apiUrl=normalized;this.state.connection='connecting';this.render();try{const data=await this.request('bootstrap');Object.assign(this.state.settings,data.settings);this.state.connection='connected';this.state.demo=false;localStorage.setItem('checking:apiUrl',normalized);this.render();this.toast('เชื่อมต่อระบบสำเร็จ');}catch(error){this.state.connection='disconnected';this.render();throw error;}}
   async demo(){this.api?.dispose();this.invalidateCache();this.dataPending.clear();this.api=new DemoApi();this.state.demo=true;this.state.connection='demo';this.state.user=this.api.user;Object.assign(this.state.settings,this.api.settings);this.queue=new DraftQueue(localStorage,this.state.user.id,'demo');await this.loadLists();await this.navigate('dashboard');await this.sync();}
   async configure(){const currentUrl=window.CHECKING_CONFIG?.apiUrl||localStorage.getItem('checking:apiUrl')||this.api?.url;if(!currentUrl){await this.showStatusAlert('ยังไม่มี Web App สำหรับตรวจสอบ','error','กรุณาติดต่อผู้ดูแลระบบเพื่อกำหนด URL เริ่มต้น');return;}const credentials=await this.formModal('ยืนยันผู้ดูแลระบบ',[{name:'username',label:'ชื่อผู้ใช้ผู้ดูแลระบบ',required:true},{name:'password',label:'รหัสผ่านผู้ดูแลระบบ',type:'password',required:true,minlength:4}],{username:this.state.user?.username||''});if(!credentials)return;this.showBusyAlert('กำลังตรวจสอบรหัสผ่านผู้ดูแล…');const verifier=new AppsScriptApi(currentUrl);let verified;try{verified=await verifier.call('login',credentials);if(!verified?.user||!['admin','super_admin'].includes(verified.user.role))throw new Error('รหัสผ่านไม่ถูกต้องหรือบัญชีไม่มีสิทธิ์ผู้ดูแลระบบ');}catch(error){verifier.dispose();this.closeBusyAlert();await this.showStatusAlert('ไม่สามารถแก้ไข Web App URL','error',error.message);return;}verifier.dispose();this.closeBusyAlert();const value=await this.formModal('แก้ไขการเชื่อมต่อ Google Apps Script',[{name:'apiUrl',label:'URL ของ Web App (ลงท้ายด้วย /exec)',type:'url',required:true}],{apiUrl:currentUrl});if(!value)return;const normalized=validateApiUrl(value.apiUrl);this.showBusyAlert('กำลังตรวจสอบ Web App URL…');const candidate=new AppsScriptApi(normalized);try{const auth=await candidate.call('login',credentials);if(!auth?.user||!['admin','super_admin'].includes(auth.user.role))throw new Error('รหัสผ่านไม่ถูกต้องหรือ Web App นี้ไม่มีสิทธิ์ผู้ดูแลระบบ');candidate.token=auth.token;const bootstrap=await candidate.call('bootstrap');this.api?.dispose();this.invalidateCache();this.dataPending.clear();this.api=candidate;this.state.apiUrl=normalized;this.state.connection='connected';this.state.demo=false;this.state.user={...auth.user,id:auth.user.id||auth.user.userId,name:auth.user.name||auth.user.displayName};this.state.settings={...this.state.settings,...bootstrap.settings};this.queue=new DraftQueue(localStorage,this.state.user.id);localStorage.setItem('checking:apiUrl',normalized);this.closeBusyAlert();this.render();await this.loadLists();await this.navigate('dashboard');await this.showStatusAlert('เชื่อมต่อระบบสำเร็จ','success');}catch(error){candidate.dispose();this.closeBusyAlert();await this.showStatusAlert('เชื่อมต่อไม่สำเร็จ','error',error.message);}}
@@ -32,7 +32,7 @@ export class AttendanceApp {
     };
   }
   async request(action,payload){
-    const title=action==='bootstrap'?'กำลังเชื่อมต่อระบบ…':action==='login'?'กำลังเข้าสู่ระบบ…':action==='logout'?'กำลังออกจากระบบ…':action==='exportPdf'?'กำลังสร้างรายงาน PDF…':/^(save|clear|import|change|reset)/.test(action)?'กำลังบันทึกข้อมูล…':'กำลังเรียกข้อมูล…';
+    const title=action==='bootstrap'?'กำลังเชื่อมต่อระบบ…':action==='login'?'กำลังเข้าสู่ระบบ…':action==='logout'?'กำลังออกจากระบบ…':action==='exportPdf'?'กำลังสร้างรายงาน PDF…':action==='adminResetPassword'?'กำลังรีเซ็ตรหัสผ่าน…':/^(save|clear|import|change|reset)/.test(action)?'กำลังบันทึกข้อมูล…':'กำลังเรียกข้อมูล…';
     const finish=this.beginActivity(title);
     try{return await this.api.call(action,payload);}finally{finish();}
   }
@@ -111,6 +111,8 @@ export class AttendanceApp {
       case 'import-teachers':await this.importTeachers();break;
       case 'edit-student':await this.editStudent(button.dataset.id);break;
       case 'manage-classrooms':await this.manageClassrooms();break;
+      case 'admin-reset-password':await this.adminResetPassword(button.dataset.userId);break;
+      case 'open-teachers':await this.navigate('teachers');break;
       case 'manage-users':await this.manageUsers();break;
       case 'view-logs':await this.showLogs();break;
       case 'change-password':await this.changePassword();break;
@@ -180,7 +182,33 @@ export class AttendanceApp {
   async logout(){this.flushReasons();if(this.queue?.items.length){const result=await this.modal({title:'ยังมีข้อมูลรอซิงก์',text:'รายการที่ยังส่งไม่สำเร็จจะเก็บในเครื่องให้บัญชีเดิมซิงก์ครั้งถัดไป ต้องการออกจากระบบหรือไม่?',icon:'warning',confirmButtonText:'ออกจากระบบ'});if(!result.isConfirmed)return;}this.toast('กำลังออกจากระบบ…','info');try{if(this.state.user)await this.call('logout');}catch{}if(this.state.demo){this.queue?.clear();this.api?.dispose();this.invalidateCache();this.dataPending.clear();this.api=null;this.state.connection='disconnected';}else if(this.api)this.api.token='';this.invalidateCache();this.dataPending.clear();this.state.user=null;this.queue=null;this.state.rosterClassrooms=[];this.state.students=[];this.state.filteredStudents=[];this.state.classrooms=[];this.state.attendance={date:today(),classroomId:'',students:[],records:[],search:''};this.state.stats={summary:summarize([],0),records:[]};this.state.dashboard={};this.state.location={status:'idle'};this.state.demo=false;await this.navigate('dashboard');this.toast('ออกจากระบบสำเร็จ','success');}
   async changePassword(required=false){const result=await this.formModal(required?'ตั้งรหัสผ่านใหม่ก่อนใช้งาน':'เปลี่ยนรหัสผ่าน',[{name:'currentPassword',label:'รหัสผ่านปัจจุบัน',type:'password',required:true},{name:'newPassword',label:'รหัสผ่านใหม่ (อย่างน้อย 8 ตัว ใช้ตัวเลขล้วนได้)',type:'password',required:true,minlength:8},{name:'confirmPassword',label:'ยืนยันรหัสผ่านใหม่',type:'password',required:true}],{},!required);if(!result){if(required){await this.logout();throw new Error('ต้องตั้งรหัสผ่านใหม่ก่อนใช้งาน');}return;}if(result.newPassword!==result.confirmPassword)throw new Error('รหัสผ่านใหม่ไม่ตรงกัน');await this.call('changePassword',result);this.state.user.mustChangePassword=false;this.toast('เปลี่ยนรหัสผ่านแล้ว');}
   async forgotPassword(){while(true){const request=await this.formModal('ขอรีเซ็ตรหัสผ่าน',[{name:'username',label:'ชื่อผู้ใช้งาน',required:true},{name:'email',label:'อีเมลที่ลงทะเบียนไว้',type:'email',required:true}],{},true);if(!request)return;this.showBusyAlert('กำลังตรวจสอบข้อมูล…');let result;try{result=await this.call('requestPasswordReset',request);}catch(error){this.closeBusyAlert();throw error;}this.closeBusyAlert();if(result.matched!==true){await this.showStatusAlert('ไม่พบชื่อผู้ใช้และอีเมลที่ระบุ','error','ชื่อผู้ใช้และอีเมลไม่ตรงกัน กรุณากรอกข้อมูลใหม่');continue;}await this.showStatusAlert('พบข้อมูลตรงกันแล้ว','success','ระบบส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลที่ระบุแล้ว');await this.modal({title:'ตรวจอีเมลของคุณ',text:'กดลิงก์รีเซ็ตรหัสผ่านที่ส่งไปยังอีเมลของคุณ ลิงก์ใช้ได้ 15 นาที',icon:'info',showCancelButton:false,confirmButtonText:'ปิด'});return;}}
-  async resetFromLink(token){const reset=await this.formModal('ตั้งรหัสผ่านใหม่',[{name:'newPassword',label:'รหัสผ่านใหม่ (อย่างน้อย 8 ตัว ใช้ตัวเลขล้วนได้)',type:'password',required:true,minlength:8},{name:'confirmPassword',label:'ยืนยันรหัสผ่านใหม่',type:'password',required:true}],{},false);if(!reset)return;if(reset.newPassword!==reset.confirmPassword)throw new Error('รหัสผ่านใหม่ไม่ตรงกัน');this.showBusyAlert('กำลังบันทึกรหัสผ่านใหม่…');await this.call('resetPassword',{token,newPassword:reset.newPassword});this.closeBusyAlert();await this.showStatusAlert('รีเซ็ตรหัสผ่านสำเร็จ','success','ตั้งรหัสผ่านใหม่แล้ว กรุณาเข้าสู่ระบบ');history.replaceState(null,'',location.pathname+'#login');await this.navigate('login');}
+  async resetFromLink(token){
+    while(true){
+      const reset=await this.formModal('ตั้งรหัสผ่านใหม่',[{name:'newPassword',label:'รหัสผ่านใหม่ (อย่างน้อย 8 ตัว ใช้ตัวเลขล้วนได้)',type:'password',required:true,minlength:8},{name:'confirmPassword',label:'ยืนยันรหัสผ่านใหม่',type:'password',required:true}],{},false);
+      if(!reset)return;
+      if(reset.newPassword!==reset.confirmPassword){await this.showStatusAlert('รหัสผ่านใหม่ไม่ตรงกัน','error','กรุณากรอกรหัสผ่านทั้งสองช่องให้ตรงกัน');continue;}
+      this.showBusyAlert('กำลังบันทึกรหัสผ่านใหม่…');
+      try{await this.call('resetPassword',{token,newPassword:reset.newPassword});}
+      catch(error){this.closeBusyAlert();await this.showStatusAlert('รีเซ็ตรหัสผ่านไม่สำเร็จ','error',error.message);return;}
+      this.closeBusyAlert();await this.showStatusAlert('รีเซ็ตรหัสผ่านสำเร็จ','success','ตั้งรหัสผ่านใหม่แล้ว กรุณาเข้าสู่ระบบ');history.replaceState(null,'',location.pathname+'#login');await this.navigate('login');return;
+    }
+  }
+  async adminResetPassword(userId){
+    if(!['admin','super_admin'].includes(this.state.user?.role))throw new Error('เฉพาะผู้ดูแลระบบเท่านั้น');
+    const user=this.state.users.find(user=>String(user.id||user.userId)===String(userId));
+    if(!user)throw new Error('ไม่พบบัญชีผู้ใช้ กรุณาโหลดรายชื่อใหม่');
+    const data=await this.formModal(`รีเซ็ตรหัสผ่าน: ${user.name||user.displayName||user.username}`,[{name:'newPassword',label:'รหัสผ่านชั่วคราวใหม่ (อย่างน้อย 8 ตัว ใช้ตัวเลขล้วนได้)',type:'password',required:true,minlength:8},{name:'confirmPassword',label:'ยืนยันรหัสผ่านชั่วคราว',type:'password',required:true,minlength:8}],{});
+    if(!data)return;
+    if(data.newPassword!==data.confirmPassword){await this.showStatusAlert('รหัสผ่านไม่ตรงกัน','error','กรุณากดรีเซ็ตรหัสผ่านแล้วกรอกใหม่');return;}
+    this.showBusyAlert('กำลังรีเซ็ตรหัสผ่าน…');
+    try{
+      await this.call('adminResetPassword',{userId,newPassword:data.newPassword});this.invalidateCache(['listUsers']);user.mustChangePassword=true;
+      const self=String(this.state.user.id||this.state.user.userId)===String(userId);
+      if(self){this.api.token='';this.state.user=null;this.state.users=[];this.state.students=[];this.state.filteredStudents=[];this.state.classrooms=[];this.state.rosterClassrooms=[];this.invalidateCache();}
+      this.render();await this.showStatusAlert('รีเซ็ตรหัสผ่านสำเร็จ','success',`${user.username}: ใช้รหัสผ่านชั่วคราวที่กำหนด และตั้งรหัสผ่านใหม่เมื่อเข้าสู่ระบบครั้งถัดไป`);
+      if(self)await this.navigate('login');
+    }catch(error){this.closeBusyAlert();await this.showStatusAlert('รีเซ็ตรหัสผ่านไม่สำเร็จ','error',error.message);}
+  }
   async editStudent(id){const s=this.state.students.find(x=>x.id===id)||{};const result=await this.formModal(id?'แก้ไขนักเรียน':'เพิ่มนักเรียน',[{name:'studentId',label:'เลขประจำตัวนักเรียน',required:true,readonly:Boolean(id)},{name:'prefix',label:'คำนำหน้า'},{name:'firstName',label:'ชื่อ',required:true},{name:'lastName',label:'นามสกุล',required:true},{name:'number',label:'เลขที่',type:'number',required:true,min:1},{name:'classroomId',label:'ห้องเรียน',options:this.state.classrooms.map(r=>({value:r.id,label:r.name})),required:true},{name:'active',label:'สถานะใช้งาน',options:[{value:'true',label:'กำลังเรียน'},{value:'false',label:'ไม่ใช้งาน'}]}],{...s,firstName:s.firstName||s.name?.split(' ')[0]||'',lastName:s.lastName||s.name?.split(' ').slice(1).join(' ')||'',active:String(s.active!==false)});if(!result)return;await this.call('saveStudent',{...result,id:s.id||'',number:Number(result.number),active:result.active==='true'});await this.loadLists();await this.navigate('students');this.toast('บันทึกนักเรียนแล้ว');}
   downloadStudentTemplate(){
     const link=document.createElement('a');

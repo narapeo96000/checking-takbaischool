@@ -108,6 +108,21 @@ class AdminService {
       const result = Authorization.user(user); result.email = UserEmailService.get(user.userId); return result;
     });
   }
+  static resetUserPassword(actor, payload, requestId) {
+    Authorization.admin(actor);
+    const userId = Validation.required(payload.userId, 'บัญชีผู้ใช้', 100);
+    const password = PasswordCrypto.password(payload.newPassword);
+    return withLock_(() => {
+      const repo = Database.repo('users'), user = repo.find('userId', userId);
+      if (!user) throw new AppError('NOT_FOUND', 'ไม่พบบัญชีผู้ใช้');
+      Object.assign(user, PasswordCrypto.credentials(password), { mustChangePassword:true, updatedAt:nowIso_() });
+      repo.update(user);
+      AuthService.revokeSessions(user.userId);
+      PasswordResetService.invalidate(user.userId);
+      AuditLog.write(actor, 'admin_reset_password', user.userId, null, { changed:true, username:user.username, mustChangePassword:true }, null, requestId);
+      return { reset:true, userId:user.userId, mustChangePassword:true };
+    });
+  }
   static saveStudent(actor, payload, requestId) {
     Authorization.admin(actor);
     return withLock_(() => {

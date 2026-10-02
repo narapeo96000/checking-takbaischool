@@ -52,3 +52,9 @@ test('roster groups by classroom with natural room/seat ordering and preserves f
   const search=Views.students({...state,studentFilters:{search:'00002'}});assert.equal((search.match(/class="card roster-room"/g)||[]).length,1);assert.ok(search.includes('คนสอง'));assert.ok(!search.includes('คนสิบ'));
   assert.ok(Views.students({...state,user:{role:'admin'}}).includes('data-action="edit-student"'));
 });
+
+test('admin personnel page offers password reset for active and inactive accounts',()=>{
+  const users=[{id:'a',username:'admin',name:'ผู้ดูแล',role:'admin',active:true},{id:'b',username:'teacher',name:'ครู',role:'advisor',active:false}];
+  const admin=Views.teachers({user:{role:'admin'},users});assert.equal((admin.match(/data-action="admin-reset-password"/g)||[]).length,2);assert.ok(admin.includes('ปิดใช้งาน'));
+  assert.ok(!Views.teachers({user:{role:'advisor'},users}).includes('data-action="admin-reset-password"'));
+});

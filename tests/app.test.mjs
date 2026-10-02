@@ -55,3 +55,15 @@ test('progress stays open until success and pending cleanup cannot close a form 
   a.api={call:async()=>{throw new Error('เครือข่ายขัดข้อง');}};await a.request('listStudents').catch(error=>a.error(error));
   assert.equal(feedback.fire.at(-1).icon,'error');assert.equal(a.busyTimer,null);t.mock.timers.tick(1000);assert.equal(feedback.closed,0);delete globalThis.Swal;
 });
+
+test('admin reset submits only target ID/new password; mismatched confirmation sends no request',async()=>{
+  const a=app();a.state.user={id:'admin',role:'admin'};a.state.users=[{id:'teacher',name:'ครู',username:'teacher'}];const calls=[];a.api={call:async(action,payload)=>{calls.push({action,payload});return {reset:true};}};a.showStatusAlert=async()=>a.clearBusyFeedback();
+  a.formModal=async()=>({newPassword:'12345678',confirmPassword:'87654321'});await a.adminResetPassword('teacher');assert.equal(calls.length,0);
+  a.formModal=async()=>({newPassword:'01234567',confirmPassword:'01234567'});await a.adminResetPassword('teacher');assert.deepEqual(calls,[{action:'adminResetPassword',payload:{userId:'teacher',newPassword:'01234567'}}]);assert.equal(a.state.users[0].mustChangePassword,true);assert.equal(a.state.user.id,'admin');
+  a.state.user.role='advisor';await assert.rejects(a.adminResetPassword('teacher'),/เฉพาะผู้ดูแล/);
+});
+test('email reset retries mismatched confirmation then consumes token without requiring login',async()=>{
+  const a=app();a.state.user=null;const forms=[{newPassword:'12345678',confirmPassword:'87654321'},{newPassword:'01234567',confirmPassword:'01234567'}],calls=[];
+  a.formModal=async()=>forms.shift();a.showStatusAlert=async()=>a.clearBusyFeedback();a.api={call:async(action,payload)=>{calls.push({action,payload});return {reset:true};}};a.navigate=async route=>{a.state.route=route;};globalThis.history={replaceState(){}};globalThis.location={pathname:'/'};
+  await a.resetFromLink('a'.repeat(64));assert.deepEqual(calls,[{action:'resetPassword',payload:{token:'a'.repeat(64),newPassword:'01234567'}}]);assert.equal(a.state.route,'login');assert.equal(a.state.user,null);
+});
