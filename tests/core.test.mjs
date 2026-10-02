@@ -43,3 +43,12 @@ test('public and signed dashboards share accessible date navigation, capped at t
     assert.match(html,/data-action="dashboard-next" disabled/);assert.ok(html.includes(`max="${today()}"`));
   }
 });
+
+test('roster groups by classroom with natural room/seat ordering and preserves filtering and escaping',()=>{
+  const state={user:{role:'advisor'},settings:{},rosterClassrooms:[{id:'B',name:'ม.1/10',advisorId:'b',advisorName:'ครู บี'},{id:'A',name:'ม.1/2',advisorId:'a',advisorName:'ครู เอ'}],classrooms:[],filters:{},students:[{id:'s10',studentId:'00010',number:10,name:'คนสิบ',classroomId:'A'},{id:'s2',studentId:'00002',number:2,name:'คนสอง',classroomId:'A'},{id:'sB',studentId:'00003',number:1,name:'ห้องบี',classroomId:'B'},{id:'sX',studentId:'00004',name:'<script>ไม่ระบุ</script>'}]};
+  const html=Views.students(state);assert.equal((html.match(/class="card roster-room"/g)||[]).length,3);
+  assert.ok(html.indexOf('data-classroom-id="A"')<html.indexOf('data-classroom-id="B"'));assert.ok(html.indexOf('คนสอง')<html.indexOf('คนสิบ'));assert.ok(html.includes('ไม่ระบุห้องเรียน'));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.ok(html.includes('00002'));assert.ok(!html.includes('data-action="edit-student"'));
+  const filtered=Views.students({...state,studentFilters:{advisorId:'b'}});assert.ok(filtered.includes('data-classroom-id="B"'));assert.ok(!filtered.includes('data-classroom-id="A"'));assert.ok(!filtered.includes('คนสอง'));
+  const search=Views.students({...state,studentFilters:{search:'00002'}});assert.equal((search.match(/class="card roster-room"/g)||[]).length,1);assert.ok(search.includes('คนสอง'));assert.ok(!search.includes('คนสิบ'));
+  assert.ok(Views.students({...state,user:{role:'admin'}}).includes('data-action="edit-student"'));
+});
