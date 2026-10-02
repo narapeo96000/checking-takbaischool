@@ -1,4 +1,4 @@
-/** Pure JavaScript SHA-256/PBKDF2 avoids fast, unsalted password storage. */
+/** SHA-256 secures tokens; PBKDF2 verifies legacy users. New passwords use the requested readable storage. */
 class PasswordCrypto {
   static bytes(text) { return Utilities.newBlob(String(text)).getBytes().map(value => value & 255); }
   static hex(bytes) { return bytes.map(value => ('0' + (value & 255).toString(16)).slice(-2)).join(''); }
@@ -47,12 +47,18 @@ class PasswordCrypto {
     return difference === 0;
   }
   static password(value) {
-    if (typeof value !== 'string' || value.length < 4 || value.length > 128) throw new AppError('VALIDATION', 'รหัสผ่านต้องยาว 4–128 ตัวอักษร');
+    if (typeof value !== 'string' || value.length < 8 || value.length > 128) throw new AppError('VALIDATION', 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร ใช้ตัวเลขล้วนได้ (ไม่เกิน 128 ตัว)');
     return value;
   }
   static credentials(password) {
-    const salt = uuid_().replace(/-/g, '') + uuid_().replace(/-/g, '');
-    return { passwordSalt: salt, passwordHash: this.derive(this.password(password), salt, APP_CONFIG.passwordIterations), passwordIterations: APP_CONFIG.passwordIterations };
+    return { password: this.password(password), passwordSalt: '', passwordHash: '', passwordIterations: '' };
+  }
+  static verify(password, user) {
+    if (!user) return false;
+    if (typeof user.password === 'string' && user.password !== '') return this.equal(password, user.password);
+    // Legacy accounts continue working until their password is changed/reset.
+    const iterations = Number(user.passwordIterations);
+    return iterations > 0 && this.equal(this.derive(password, user.passwordSalt, iterations), user.passwordHash);
   }
 }
 
@@ -91,8 +97,7 @@ class AuthService {
       const failures = Number(cache.get(key) || 0), globalFailures = Number(cache.get(globalKey) || 0);
       if (failures >= 8 || globalFailures >= 80) throw new AppError('RATE_LIMIT', 'ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ 15 นาที');
       const user = Database.repo('users').all().find(item => String(item.username).toLowerCase() === username);
-      const hash = PasswordCrypto.derive(password, user ? user.passwordSalt : 'unknown-account-dummy-salt', user ? Number(user.passwordIterations) : APP_CONFIG.passwordIterations);
-      if (!user || !Validation.bool(user.active) || !PasswordCrypto.equal(hash, user.passwordHash)) {
+      if (!user || !Validation.bool(user.active) || !PasswordCrypto.verify(password, user)) {
         cache.put(key, String(failures + 1), 900); cache.put(globalKey, String(globalFailures + 1), 900);
         AuditLog.write(null, 'login_failed', username, null, { username }, null, requestId);
         throw new AppError('LOGIN_FAILED', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
@@ -122,7 +127,7 @@ class AuthService {
     if (newPassword === payload.currentPassword) throw new AppError('VALIDATION', 'รหัสผ่านใหม่ต้องต่างจากรหัสผ่านเดิม');
     return withLock_(() => {
       const repo = Database.repo('users'), user = repo.find('userId', actor.userId);
-      if (!PasswordCrypto.equal(PasswordCrypto.derive(String(payload.currentPassword || ''), user.passwordSalt, Number(user.passwordIterations)), user.passwordHash)) throw new AppError('VALIDATION', 'รหัสผ่านปัจจุบันไม่ถูกต้อง');
+      if (!PasswordCrypto.verify(String(payload.currentPassword || ''), user)) throw new AppError('VALIDATION', 'รหัสผ่านปัจจุบันไม่ถูกต้อง');
       Object.assign(user, PasswordCrypto.credentials(newPassword), { mustChangePassword: false, updatedAt: nowIso_() }); repo.update(user);
       this.revokeSessions(user.userId, actor._session.tokenHash);
       AuditLog.write(user, 'change_password', user.userId, null, { changed: true }, null, requestId);

@@ -8,7 +8,15 @@ class SheetRepository {
     this.assertSchema();
   }
   assertSchema() {
+    if (this.name === 'users' && this.sheet.getMaxColumns() < this.columns.length) this.sheet.insertColumnsAfter(this.sheet.getMaxColumns(), this.columns.length - this.sheet.getMaxColumns());
     const actual = this.sheet.getRange(1, 1, 1, this.columns.length).getValues()[0];
+    // Append only the new password column; preserve every legacy user field and row.
+    if (this.name === 'users' && actual[actual.length - 1] === '' && this.columns.slice(0, -1).every((column, i) => actual[i] === column)) {
+      if (this.sheet.getMaxColumns() < this.columns.length) this.sheet.insertColumnsAfter(this.sheet.getMaxColumns(), this.columns.length - this.sheet.getMaxColumns());
+      this.sheet.getRange(1, this.columns.length, 1, 1).setValues([['password']]);
+      this.sheet.getRange(2, this.columns.length, this.sheet.getMaxRows() - 1, 1).setNumberFormat('@');
+      actual[actual.length - 1] = 'password';
+    }
     if (this.columns.some((column, i) => actual[i] !== column)) throw new AppError('SCHEMA', 'หัวตารางชีต ' + this.name + ' ไม่ตรงกับระบบ กรุณาตรวจสอบก่อนใช้งาน');
   }
   all() {
@@ -87,6 +95,7 @@ class Database {
       if (!sheet) sheet = spreadsheet.insertSheet(name);
       if (sheet.getMaxColumns() < columns.length) sheet.insertColumnsAfter(sheet.getMaxColumns(), columns.length - sheet.getMaxColumns());
       if (sheet.getLastRow() > 0) {
+        if (name === 'users') new SheetRepository(name, spreadsheet);
         const actual = sheet.getRange(1, 1, 1, columns.length).getValues()[0];
         if (columns.some((column, i) => column !== actual[i])) throw new AppError('SCHEMA', 'ชีต ' + name + ' มีข้อมูลเดิมและหัวตารางไม่ตรง ระบบจะไม่เขียนทับ');
       } else sheet.getRange(1, 1, 1, columns.length).setValues([columns]);

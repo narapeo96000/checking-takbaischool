@@ -75,13 +75,13 @@ test.beforeEach(reset);
 test('SHA-256 and PBKDF2 match independent crypto vectors',()=>{
   for(const s of ['', 'abc','สวัสดีภาษาไทย','a'.repeat(500)])assert.equal(api.PasswordCrypto.hash(s),crypto.createHash('sha256').update(s).digest('hex'));
   for(const n of [1,2,4096])assert.equal(api.PasswordCrypto.derive('password','salt',n),crypto.pbkdf2Sync('password','salt',n,32,'sha256').toString('hex'));
-  const c=api.PasswordCrypto.credentials(fixturePassword);assert.equal(c.passwordIterations,120000);assert.equal(c.passwordHash,crypto.pbkdf2Sync(fixturePassword,c.passwordSalt,120000,32,'sha256').toString('hex'));assert.notEqual(c.passwordHash,fixturePassword);
+  const c=api.PasswordCrypto.credentials(fixturePassword);assert.equal(c.password,fixturePassword);assert.equal(c.passwordHash,'');assert.equal(c.passwordSalt,'');assert.equal(c.passwordIterations,'');assert.equal(api.PasswordCrypto.verify(fixturePassword,c),true);assert.equal(api.PasswordCrypto.verify('incorrect',c),false);
 });
 
-test('password policy accepts simple four-digit passwords',()=>{
-  assert.equal(api.PasswordCrypto.password('1234'),'1234');
-  assert.equal(api.PasswordCrypto.password('abcd'),'abcd');
-  assert.throws(()=>api.PasswordCrypto.password('123'),e=>e.code==='VALIDATION');
+test('password policy accepts numeric eight-character passwords and rejects short values',()=>{
+  assert.equal(api.PasswordCrypto.password('01234567'),'01234567');
+  assert.equal(api.PasswordCrypto.password('abcdefgh'),'abcdefgh');
+  assert.throws(()=>api.PasswordCrypto.password('1234567'),e=>e.code==='VALIDATION');
 });
 
 test('initialization preserves data, is idempotent, seeds no people and rejects bad headers',()=>{
@@ -219,4 +219,22 @@ test('last admin is retained, formula text is escaped, user API never includes p
   const {admin}=seed();assert.throws(()=>api.AdminService.saveUser(admin,{userId:admin.userId,username:'admin',displayName:'Admin',role:'advisor',classroomIds:[],active:true},''),e=>e.code==='VALIDATION');
   api.AdminService.saveStudent(admin,{studentId:'00004',prefix:'',firstName:'=IMPORTXML("x")',lastName:'ปลอดภัย',classroomId:'A',number:4,active:true},'');assert.equal(state.sheets.get('students').rows.at(-1)[2].startsWith("'="),true);
   const auth=login('admin'),users=api.dispatch({action:'listUsers',token:auth.token,payload:{}}).data;assert.equal(JSON.stringify(users).includes(fixtureHash),false);assert.equal(JSON.stringify(users).includes(fixtureSalt),false);
+});
+
+test('legacy user schema gains password column without overwriting hashes or rows',()=>{
+  seed();const sheet=state.sheets.get('users');sheet.rows.forEach(row=>row.pop());
+  const before=sheet.rows.map(row=>row.slice());const repo=api.Database.repo('users');
+  assert.equal(sheet.rows[0][12],'password');assert.deepEqual(sheet.rows.slice(1).map(row=>row.slice(0,12)),before.slice(1));
+  assert.equal(api.PasswordCrypto.verify(fixturePassword,repo.find('userId','admin-1')),true);
+  api.Database.initialize();assert.equal(repo.all().length,3);
+});
+test('password changes store readable eight-digit password, preserve zero, and revoke other sessions',()=>{
+  seed();const first=login('admin'),second=login('admin');const actor=api.AuthService.authenticate(first.token,true);
+  api.AuthService.changePassword(actor,{currentPassword:fixturePassword,newPassword:'01234567'},'change');
+  const user=api.Database.repo('users').find('userId','admin-1');assert.equal(user.password,'01234567');assert.equal(user.passwordHash,'');
+  assert.equal(api.AuthService.login({username:'admin',password:'01234567'},'new-login').user.username,'admin');
+  assert.throws(()=>api.AuthService.login({username:'admin',password:fixturePassword},'old-login'),e=>e.code==='LOGIN_FAILED');
+  assert.throws(()=>api.AuthService.authenticate(second.token,true),e=>e.code==='UNAUTHORIZED');
+  assert.equal(JSON.stringify(api.AdminService.users(user)).includes('01234567'),false);
+  assert.equal(JSON.stringify(state.sheets.get('logs').rows).includes('01234567'),false);
 });
