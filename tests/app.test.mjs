@@ -18,3 +18,14 @@ test('one classroom request supplies schoolwide roster filters but only assigned
   await a.loadLists();assert.deepEqual(a.state.rosterClassrooms.map(room=>room.id),['A','B']);assert.deepEqual(a.state.classrooms.map(room=>room.id),['A']);assert.equal(a.state.attendance.classroomId,'A');assert.equal(a.state.students[0].classroomId,'B');assert.equal(requests.length,2);assert.equal(requests.find(request=>request.action==='listClassrooms').payload.scope,'roster');
   await a.loadLists();assert.equal(requests.length,2);
 });
+
+test('dashboard navigation crosses month/year boundaries and reuses public date cache',async()=>{
+  const a=app();a.state.user=null;a.state.filters.date='2026-01-01';a.state.dashboard={date:'2026-01-01'};
+  globalThis.history={replaceState(){}};document.body={classList:{remove(){}}};const calls=[];
+  a.api={call:async(action,payload)=>{calls.push({action,date:payload.date});return {date:payload.date,summary:{},daily:[]};}};
+  await a.stepDashboardDate(-1);assert.equal(a.state.dashboard.date,'2025-12-31');
+  await a.stepDashboardDate(1);assert.equal(a.state.dashboard.date,'2026-01-01');
+  await a.stepDashboardDate(-1);assert.equal(calls.length,2);assert.ok(calls.every(c=>c.action==='publicDashboard'));assert.equal(a.state.route,'dashboard');
+  a.state.loading=true;await a.stepDashboardDate(-1);assert.equal(a.state.filters.date,'2025-12-31');
+  a.state.loading=false;await a.setDashboardDate('');await a.setDashboardDate('2026-02-30');assert.equal(calls.length,2);
+});

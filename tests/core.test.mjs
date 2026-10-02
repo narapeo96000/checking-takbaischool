@@ -33,3 +33,13 @@ test('roster filters include every classroom while attendance selector only incl
   const attendance=Views.attendance(state);assert.ok(attendance.includes('<option value="A"'));assert.equal(attendance.includes('<option value="B"'),false);
   assert.ok(Views.attendance({...state,classrooms:[]}).includes('ยังไม่ได้รับมอบหมายห้องเรียน'));
 });
+
+test('public and signed dashboards share accessible date navigation, capped at today',async()=>{
+  const {today}=await import('../assets/core.js');
+  for(const user of [null,{role:'advisor',name:'ครู'}]){
+    const html=Views.dashboard({user,settings:{},filters:{date:today()},dashboard:{date:today(),summary:{},daily:[]},classrooms:[]});
+    for(const action of ['dashboard-previous','dashboard-today','dashboard-next'])assert.ok(html.includes(`data-action="${action}"`));
+    assert.equal((html.match(/id="dashboard-date"/g)||[]).length,1);
+    assert.match(html,/data-action="dashboard-next" disabled/);assert.ok(html.includes(`max="${today()}"`));
+  }
+});
