@@ -66,13 +66,16 @@ class SettingsService {
 }
 
 class AdminService {
-  static classrooms(actor) {
-    const users = Database.repo('users').all();
-    return Authorization.rooms(actor).map(room => Object.assign(SheetRepository.clean(room), { active: Validation.bool(room.active), advisorName: (users.find(user => user.userId === room.advisorId) || {}).displayName || '' })).sort((a,b) => a.name.localeCompare(b.name, 'th', { numeric: true }));
+  static classrooms(actor, includeAll = false) {
+    const users = new Map(Database.repo('users').all().map(user => [user.userId, user.displayName]));
+    const assigned = Authorization.rooms(actor), assignedIds = new Set(assigned.map(room => room.classroomId));
+    const rooms = includeAll ? Database.repo('classrooms').all() : assigned;
+    return rooms.map(room => Object.assign(SheetRepository.clean(room), { active: Validation.bool(room.active), advisorName: users.get(room.advisorId) || '', canCheckAttendance: assignedIds.has(room.classroomId) && Validation.bool(room.active) })).sort((a,b) => a.name.localeCompare(b.name, 'th', { numeric: true }));
   }
   static students(actor, payload) {
-    const rooms = this.classrooms(actor), allowed = rooms.map(room => room.classroomId);
-    if (payload.classroomId) Authorization.classroom(actor, payload.classroomId);
+    // All authenticated teachers may read the roster. Attendance keeps its own write ACL.
+    const rooms = this.classrooms(actor, true), allowed = rooms.map(room => room.classroomId);
+    if (payload.classroomId && !allowed.includes(payload.classroomId)) throw new AppError('NOT_FOUND', 'ไม่พบห้องเรียนที่ค้นหา');
     if (payload.advisorId) allowed.splice(0, allowed.length, ...rooms.filter(room => room.advisorId === payload.advisorId).map(room => room.classroomId));
     const search = Validation.text(payload.search, 200).toLocaleLowerCase();
     return Database.repo('students').all().filter(student => allowed.includes(student.classroomId) && (!payload.classroomId || student.classroomId === payload.classroomId) && (!payload.studentId || String(student.studentId) === String(payload.studentId)) && (payload.includeInactive || Validation.bool(student.active)) && (!search || [student.studentId,student.prefix,student.firstName,student.lastName].join(' ').toLocaleLowerCase().includes(search))).map(student => {

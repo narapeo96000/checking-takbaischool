@@ -25,3 +25,11 @@ test('dashboard shows all five totals and a shared bar/line chart with exact wei
   assert.equal(AttendanceTrendChart.rate({...days[0],hasData:false},{}),null);
   assert.equal(AttendanceTrendChart.rate({total:0,rate:100},{}),null);
 });
+
+test('roster filters include every classroom while attendance selector only includes assigned rooms',()=>{
+  const own={id:'A',name:'ม.1/1',advisorId:'teacher',advisorName:'ครู เอ'};const other={id:'B',name:'ม.1/2',advisorId:'other',advisorName:'ครู บี'};
+  const state={user:{id:'teacher',role:'advisor'},settings:{},classrooms:[own],rosterClassrooms:[own,other],students:[{id:'s3',studentId:'00003',name:'นักเรียนห้องอื่น',classroomId:'B',active:true}],filters:{},attendance:{date:'2026-10-02',classroomId:'A',students:[],records:[]},location:{}};
+  const roster=Views.students(state);assert.ok(roster.includes('<option value="B"'));assert.ok(roster.includes('นักเรียนห้องอื่น'));assert.ok(roster.includes('ครู บี'));assert.equal(roster.includes('data-action="edit-student"'),false);
+  const attendance=Views.attendance(state);assert.ok(attendance.includes('<option value="A"'));assert.equal(attendance.includes('<option value="B"'),false);
+  assert.ok(Views.attendance({...state,classrooms:[]}).includes('ยังไม่ได้รับมอบหมายห้องเรียน'));
+});

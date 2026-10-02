@@ -151,12 +151,12 @@ test('auth hashes sessions, enforces initial reset, revokes logout and denies an
   const auth=login();assert.equal(auth.mustChangePassword,true);const s=api.Database.repo('sessions').all()[0];assert.notEqual(s.tokenHash,auth.token);assert.equal(s.tokenHash,api.PasswordCrypto.hash(auth.token));
   assert.equal(api.dispatch({action:'listStudents',payload:{},token:auth.token}).error.code,'PASSWORD_CHANGE_REQUIRED');assert.equal(api.dispatch({action:'listStudents',payload:{}}).error.code,'UNAUTHORIZED');
   const changed=api.dispatch({action:'changePassword',token:auth.token,payload:{currentPassword:fixturePassword,newPassword:'An-even-better-pass!'}});assert.equal(changed.ok,true);assert.equal(changed.data.user.mustChangePassword,false);
-  assert.equal(api.dispatch({action:'listStudents',payload:{},token:auth.token}).data.length,2);
+  assert.equal(api.dispatch({action:'listStudents',payload:{},token:auth.token}).data.length,3);
   assert.equal(api.dispatch({action:'logout',payload:{},token:auth.token}).ok,true);assert.equal(api.dispatch({action:'listStudents',payload:{},token:auth.token}).error.code,'UNAUTHORIZED');
 });
 
 test('advisor ACL covers list/statistics/attendance/admin APIs and reads current active user',()=>{
-  const {teacher}=seed(),auth=login();assert.deepEqual(plain(api.AdminService.students(teacher,{})).map(s=>s.studentId),['00001','00002']);
+  const {teacher}=seed(),auth=login();assert.deepEqual(plain(api.AdminService.students(teacher,{})).map(s=>s.studentId),['00001','00002','00003']);
   const rooms=api.AdminService.classrooms(teacher);assert.equal(rooms.length,1);assert.equal(rooms[0].advisorName,'ครู เอ');
   for(const action of ['getAttendance','statistics'])assert.equal(api.dispatch({action,token:auth.token,payload:{classroomId:'B',date:api.today_()}}).error.code,'FORBIDDEN');
   for(const action of ['getSettings','saveSettings','listUsers','saveUser','saveStudent','saveClassroom','getLogs'])assert.equal(api.dispatch({action,token:auth.token,payload:{}}).error.code,'FORBIDDEN');
@@ -254,4 +254,21 @@ test('public dashboard includes active student count before the first check with
   seed();const result=api.dispatch({action:'publicDashboard',payload:{date:api.today_()}});
   assert.equal(result.ok,true);assert.equal(result.data.summary.total,3);assert.equal(result.data.summary.unmarked,3);assert.equal(result.data.daily.length,7);
   const text=JSON.stringify(result.data);for(const key of ['password','studentId','username','latitude','fullName'])assert.equal(text.includes(key),false);
+});
+
+test('teachers search every classroom while attendance save and clear remain limited to their own room',()=>{
+  const {teacher}=seed(),auth=login();
+  const rooms=api.dispatch({action:'listClassrooms',token:auth.token,payload:{scope:'roster'}});assert.equal(rooms.ok,true);assert.equal(rooms.data.length,2);assert.equal(rooms.data.find(room=>room.classroomId==='A').canCheckAttendance,true);assert.equal(rooms.data.find(room=>room.classroomId==='B').canCheckAttendance,false);
+  for(const payload of [{classroomId:'B'},{advisorId:'advisor-b'},{search:'อื่น'},{studentId:'00003'}]){const result=api.dispatch({action:'listStudents',token:auth.token,payload});assert.equal(result.ok,true);assert.equal(result.data.length,1);assert.equal(result.data[0].studentId,'00003');}
+  for(const action of ['getAttendance','saveAttendance','clearAttendance']){const result=api.dispatch({action,token:auth.token,payload:mutation([{studentId:'00003',status:'present'}],{classroomId:'B'})});assert.equal(result.error.code,'FORBIDDEN');}
+  const own=api.dispatch({action:'saveAttendance',token:auth.token,payload:mutation([{studentId:'00001',status:'present'}])});assert.equal(own.ok,true);
+  const room=api.Database.repo('classrooms').find('classroomId','A');room.advisorId='advisor-b';api.Database.repo('classrooms').update(room);
+  assert.equal(api.dispatch({action:'clearAttendance',token:auth.token,payload:mutation([], {baseRevision:1})}).error.code,'FORBIDDEN');
+  assert.equal(api.Database.repo('attendance').all().length,1);
+});
+test('teacher without assigned classrooms can read roster but cannot record attendance',()=>{
+  seed();const user=api.Database.repo('users').find('userId','advisor-a');user.userId='unassigned';user.username='unassigned';api.Database.repo('users').append({...user,_row:undefined});
+  const auth=login('unassigned');assert.equal(auth.user.classroomIds.length,0);assert.equal(api.dispatch({action:'listStudents',token:auth.token,payload:{}}).data.length,3);
+  assert.equal(api.dispatch({action:'listClassrooms',token:auth.token,payload:{scope:'roster'}}).data.every(room=>!room.canCheckAttendance),true);
+  assert.equal(api.dispatch({action:'saveAttendance',token:auth.token,payload:mutation([{studentId:'00001',status:'present'}])}).error.code,'FORBIDDEN');
 });

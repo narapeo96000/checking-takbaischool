@@ -25,7 +25,7 @@ function dispatch(request) {
       case 'logout': result = AuthService.logout(actor,requestId); break;
       case 'changePassword': result = AuthService.changePassword(actor,payload,requestId); break;
       case 'listStudents': result = AdminService.students(actor,payload); break;
-      case 'listClassrooms': result = AdminService.classrooms(actor); break;
+      case 'listClassrooms': result = AdminService.classrooms(actor,payload.scope === 'roster'); break;
       case 'getAttendance': result = AttendanceService.get(actor,payload); break;
       case 'saveAttendance': result = AttendanceService.mutate(actor,payload,requestId,false); break;
       case 'clearAttendance': result = AttendanceService.mutate(actor,payload,requestId,true); break;
