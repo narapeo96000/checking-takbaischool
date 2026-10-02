@@ -1,4 +1,4 @@
-import {Views} from './views.js?v=password-reset-admin-20261002';
+import {Views} from './views.js?v=roster-collapsed-20261002';
 import {renderUserGuide} from './manual.js?v=password-reset-admin-20261002';
 import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=password-reset-admin-20261002';
 import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl} from './core.js';
