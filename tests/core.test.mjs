@@ -10,3 +10,18 @@ test('expired drafts are removed before reuse',()=>{const storage=new MemoryStor
 test('only published Apps Script exec URLs are accepted',()=>{assert.equal(validateApiUrl('https://script.google.com/macros/s/Abc_123/exec'),'https://script.google.com/macros/s/Abc_123/exec');for(const url of ['https://evil.test/macros/s/Abc/exec','https://script.google.com/macros/s/Abc/dev','https://script.google.com/macros/s/Abc/exec?token=secret','javascript:alert(1)'])assert.throws(()=>validateApiUrl(url));});
 test('student names and reasons are escaped in attendance and statistics views',()=>{const state={user:{role:'admin'},settings:{},classrooms:[{id:'c',name:'ม.1/1'}],students:[{id:'s',studentId:'00001',name:'<script>alert(1)</script>',classroomId:'c',active:true}],attendance:{date:'2026-10-01',classroomId:'c',students:[],records:[{studentId:'s',status:'leave',reason:'<img onerror=alert(1)>'}]},stats:{summary:{},records:[{date:'2026-10-01',name:'<script>',reason:'<img>',status:'leave'}]},filters:{},location:{}};assert.ok(!Views.attendance(state).includes('<script>'));assert.ok(!Views.statistics(state).includes('<img>'));assert.equal(escapeHtml('"<>&\''),'&quot;&lt;&gt;&amp;&#39;');});
 test('demo mutation retries are idempotent and clearing stays within date room',async()=>{const api=new DemoApi();const date='2026-09-30';const room=api.classrooms[0];const student=api.students[0];const payload={date,classroomId:room.id,records:[{studentId:student.id,status:'absent',reason:'ตัวอย่าง'}],mutationId:'stable-id'};await api.call('saveAttendance',payload);await api.call('saveAttendance',payload);assert.equal((await api.call('getAttendance',{date,classroomId:room.id})).records.length,1);await api.call('clearAttendance',{date,classroomId:room.id,mutationId:'clear-id'});assert.equal((await api.call('getAttendance',{date,classroomId:room.id})).records.length,0);assert.ok(api.rows.length>0);});
+
+
+test('dashboard shows all five totals and a shared bar/line chart with exact weighted percentages',async()=>{
+  const {AttendanceTrendChart}=await import('../assets/charts.js');
+  const days=[{date:'2026-10-01',total:40,present:30,absent:2,leave:4,late:4,rate:82.5},{date:'2026-10-02',total:40,present:0,absent:40,leave:0,late:0,rate:0}];
+  const data={summary:days[0],daily:days};
+  for(const user of [null,{role:'admin',name:'ครู'}]){
+    const html=Views.dashboard({user,settings:{},dashboard:data,classrooms:[],students:[],filters:{}});
+    for(const key of ['stat-primary','stat-present','stat-absent','stat-leave','stat-late'])assert.ok(html.includes(key));
+    assert.ok(html.includes('attendance-combo-chart'));assert.ok(html.includes('<rect'));assert.ok(html.includes('class="trend-line"'));assert.ok(html.includes('82.5%'));assert.ok(html.includes('0%'));assert.ok(html.includes('ดูตัวเลขรายวัน'));
+  }
+  assert.equal(AttendanceTrendChart.rate({...days[0],rate:null},{present:1,leave:0.5,late:0.25,absent:0}),82.5);
+  assert.equal(AttendanceTrendChart.rate({...days[0],hasData:false},{}),null);
+  assert.equal(AttendanceTrendChart.rate({total:0,rate:100},{}),null);
+});

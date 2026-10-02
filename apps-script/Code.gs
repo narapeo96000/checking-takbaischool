@@ -29,7 +29,7 @@ function dispatch(request) {
       case 'getAttendance': result = AttendanceService.get(actor,payload); break;
       case 'saveAttendance': result = AttendanceService.mutate(actor,payload,requestId,false); break;
       case 'clearAttendance': result = AttendanceService.mutate(actor,payload,requestId,true); break;
-      case 'dashboard': result = ReportService.statistics(actor,Object.assign({ date:today_() },payload)); break;
+      case 'dashboard': result = ReportService.statistics(actor,Object.assign({ date:today_() },payload,{trendDays:7})); break;
       case 'statistics': result = ReportService.statistics(actor,payload); break;
       case 'getSettings': result = SettingsService.get(actor); break;
       case 'saveSettings': result = SettingsService.save(actor,payload,requestId); break;

@@ -1,4 +1,4 @@
-import {Views} from './views.js';
+import {Views} from './views.js?v=dashboard-trend-20261002';
 import {renderUserGuide} from './manual.js?v=password8-20261002';
 import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=reference-theme-20261001';
 import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl} from './core.js';

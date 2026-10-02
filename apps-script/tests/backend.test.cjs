@@ -238,3 +238,20 @@ test('password changes store readable eight-digit password, preserve zero, and r
   assert.equal(JSON.stringify(api.AdminService.users(user)).includes('01234567'),false);
   assert.equal(JSON.stringify(state.sheets.get('logs').rows).includes('01234567'),false);
 });
+
+test('dashboard trend covers seven days without adding earlier counts to selected-day totals',()=>{
+  const {teacher}=seed();const date=api.today_();
+  const yesterday=new Date(new Date(date+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
+  api.AttendanceService.mutate(teacher,mutation([{studentId:'00001',status:'present',reason:''}],{date:yesterday}),'prior',false);
+  api.AttendanceService.mutate(teacher,mutation([{studentId:'00002',status:'leave',reason:''}]),'current',false);
+  const data=api.dispatch({action:'dashboard',token:login().token,payload:{date}});
+  assert.equal(data.ok,true);assert.equal(data.data.daily.length,7);assert.equal(data.data.summary.present,0);assert.equal(data.data.summary.leave,1);assert.equal(data.data.summary.total,2);assert.equal(data.data.summary.dateCount,1);
+  assert.equal(data.data.daily.find(day=>day.date===yesterday).present,1);
+  assert.equal(data.data.records.length,1);assert.equal(data.data.byClassroom[0].present,0);
+  assert.equal(data.data.daily[0].hasData,false);
+});
+test('public dashboard includes active student count before the first check without disclosing private records',()=>{
+  seed();const result=api.dispatch({action:'publicDashboard',payload:{date:api.today_()}});
+  assert.equal(result.ok,true);assert.equal(result.data.summary.total,3);assert.equal(result.data.summary.unmarked,3);assert.equal(result.data.daily.length,7);
+  const text=JSON.stringify(result.data);for(const key of ['password','studentId','username','latitude','fullName'])assert.equal(text.includes(key),false);
+});

@@ -5,7 +5,13 @@ class ReportService {
     const effectiveDate = date > today_() ? today_() : date;
     const weights = SettingsService.all(true).attendanceWeights;
     const publicRows = Database.repoPublic('public_stats').all();
-    const summary = Object.assign({ date: effectiveDate }, publicRows.find(row => row.date === effectiveDate) || { present: 0, absent: 0, late: 0, leave: 0, unmarked: 0, total: 0, rate: 0 });
+    const currentRow = publicRows.find(row => row.date === effectiveDate);
+    let rosterCount = 0;
+    if (!currentRow && effectiveDate === today_()) {
+      const spreadsheet = Database.openPublic();
+      if (spreadsheet.getSheetByName('students')) rosterCount = new SheetRepository('students', spreadsheet).all().filter(student => Validation.bool(student.active)).length;
+    }
+    const summary = Object.assign({ date: effectiveDate }, currentRow || { present: 0, absent: 0, late: 0, leave: 0, unmarked: rosterCount, total: rosterCount, rate: 0 });
     const daily = [];
     const anchor = new Date(effectiveDate + 'T00:00:00Z');
     for (let offset = 6; offset >= 0; offset--) {
@@ -40,18 +46,20 @@ class ReportService {
     if (payload.studentId) Validation.id(payload.studentId, 'เลขประจำตัวนักเรียน');
     const matches = student => (!payload.studentId || String(student.studentId) === String(payload.studentId)) && (!search || [student.studentId,student.prefix,student.firstName,student.lastName].join(' ').toLocaleLowerCase().includes(search));
     const selectedStudents = students.filter(student => roomIds.includes(student.classroomId) && Validation.bool(student.active) && matches(student));
-    const scopedRaw = Database.repo('attendance').all().filter(record => roomIds.includes(record.classroomId) && record.date >= range.dateFrom && record.date <= range.dateTo);
+    const trend = Boolean(payload.date && payload.trendDays);
+    const readFrom = trend ? new Date(new Date(range.dateFrom + 'T00:00:00Z').getTime() - 6 * 86400000).toISOString().slice(0,10) : range.dateFrom;
+    const scopedRaw = Database.repo('attendance').all().filter(record => roomIds.includes(record.classroomId) && record.date >= readFrom && record.date <= range.dateTo);
     const raw = scopedRaw.filter(record => matches(people[record.studentId] || { studentId: record.studentId }));
     const records = raw.map(record => {
       const student = people[record.studentId] || {}, room = selectedRooms.find(item => item.classroomId === record.classroomId) || {};
       return Object.assign(SheetRepository.clean(record), { fullName: [student.prefix,student.firstName,student.lastName].filter(Boolean).join(' ') || record.studentId, number: student.number || '', classroomName: room.name || record.classroomId, advisorId: room.advisorId || '', advisorName: room.advisorName || '', updatedByName: users[record.updatedBy] || '', locationRecorded: record.latitude !== '' && record.longitude !== '' });
     }).sort((a,b) => b.date.localeCompare(a.date) || a.classroomName.localeCompare(b.classroomName, 'th', { numeric: true }) || Number(a.number) - Number(b.number));
     const recordedDates = new Set(scopedRaw.map(record => record.date));
-    Database.repo('attendance_batches').all().filter(batch => roomIds.includes(batch.classroomId) && batch.date >= range.dateFrom && batch.date <= range.dateTo).forEach(batch => recordedDates.add(batch.date));
+    Database.repo('attendance_batches').all().filter(batch => roomIds.includes(batch.classroomId) && batch.date >= readFrom && batch.date <= range.dateTo).forEach(batch => recordedDates.add(batch.date));
     // Monthly/range reports use recorded days, never assume weekends/holidays
     // are school days. A single-day report still shows the unmarked roster.
     const singleDay = !!payload.date || range.dateFrom === range.requestedDateTo;
-    const dates = singleDay && range.dateFrom <= range.dateTo ? [range.dateFrom] : [...recordedDates].sort();
+    const dates = trend ? Array.from({length:7}, (_, i) => new Date(new Date(readFrom + 'T00:00:00Z').getTime() + i * 86400000).toISOString().slice(0,10)) : singleDay && range.dateFrom <= range.dateTo ? [range.dateFrom] : [...recordedDates].sort();
     const weights = SettingsService.all().attendanceWeights;
     const daily = [], byClassroom = selectedRooms.map(room => Object.assign({ classroomId: room.classroomId, classroomName: room.name, advisorId: room.advisorId, advisorName: room.advisorName }, AttendanceService.summary([],0,weights)));
     const summary = AttendanceService.summary([],0,weights);
@@ -62,15 +70,15 @@ class ReportService {
         const ids = new Set(selectedStudents.filter(student => student.classroomId === room.classroomId && (!student.createdAt || bangkokDate_(student.createdAt) <= date)).map(student => student.studentId));
         dayRecords.forEach(record => ids.add(record.studentId));
         const count = AttendanceService.summary(dayRecords, ids.size, weights);
-        ['present','absent','late','leave','unmarked','total'].forEach(key => { dailySummary[key] += count[key]; byClassroom[i][key] += count[key]; summary[key] += count[key]; });
+        ['present','absent','late','leave','unmarked','total'].forEach(key => { dailySummary[key] += count[key]; if (date >= range.dateFrom) { byClassroom[i][key] += count[key]; summary[key] += count[key]; } });
       });
       dailySummary.rate = dailySummary.total ? Math.round((dailySummary.present * weights.present + dailySummary.leave * weights.leave + dailySummary.late * weights.late + dailySummary.absent * weights.absent) / dailySummary.total * 10000) / 100 : 0;
-      daily.push(Object.assign({ date },dailySummary));
+      daily.push(Object.assign({ date, ...(trend ? {hasData: recordedDates.has(date)} : {}) },dailySummary));
     });
     summary.rate = summary.total ? Math.round((summary.present * weights.present + summary.leave * weights.leave + summary.late * weights.late + summary.absent * weights.absent) / summary.total * 10000) / 100 : 0;
-    summary.dateCount = dates.length;
+    summary.dateCount = trend ? 1 : dates.length;
     byClassroom.forEach(row => { row.rate = row.total ? Math.round((row.present * weights.present + row.leave * weights.leave + row.late * weights.late + row.absent * weights.absent) / row.total * 10000) / 100 : 0; });
-    return { summary, daily, byClassroom, records, classrooms: selectedRooms, range, studentCount: selectedStudents.length, attendanceWeights: weights, attendanceRateDefinition: `(มา × ${weights.present}) + (ลา × ${weights.leave}) + (สาย × ${weights.late}) + (ขาด × ${weights.absent}) หารด้วยจำนวนรายการที่ควรเช็คชื่อ × 100`, denominatorNote: (singleDay ? 'รายวันใช้รายชื่อนักเรียนที่ควรเช็คชื่อ' : 'เฉพาะวันที่มีการบันทึกเช็คชื่อ ไม่ใช่ปฏิทินวันเรียน') + '; ใช้รายชื่อนักเรียนปัจจุบันที่เปิดใช้งานและสร้างแล้ว ณ วันนั้น รวมรายการเช็คชื่อย้อนหลังที่มีอยู่' };
+    return { summary, daily, byClassroom, records: trend ? records.filter(record => record.date >= range.dateFrom) : records, date: payload.date || null, classrooms: selectedRooms, range, studentCount: selectedStudents.length, attendanceWeights: weights, attendanceRateDefinition: `(มา × ${weights.present}) + (ลา × ${weights.leave}) + (สาย × ${weights.late}) + (ขาด × ${weights.absent}) หารด้วยจำนวนรายการที่ควรเช็คชื่อ × 100`, denominatorNote: (singleDay ? 'รายวันใช้รายชื่อนักเรียนที่ควรเช็คชื่อ' : 'เฉพาะวันที่มีการบันทึกเช็คชื่อ ไม่ใช่ปฏิทินวันเรียน') + '; ใช้รายชื่อนักเรียนปัจจุบันที่เปิดใช้งานและสร้างแล้ว ณ วันนั้น รวมรายการเช็คชื่อย้อนหลังที่มีอยู่' };
   }
   static exportPdf(actor, payload, requestId) {
     const report = this.statistics(actor,payload), settings = SettingsService.publicSettings();
