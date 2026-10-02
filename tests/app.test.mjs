@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {AttendanceApp} from '../assets/app.js';
 import {DraftQueue} from '../assets/core.js';
 const storage=()=>({map:new Map(),getItem(k){return this.map.get(k)||null;},setItem(k,v){this.map.set(k,v);},removeItem(k){this.map.delete(k);}});
-function app(){globalThis.document={addEventListener(){}};globalThis.window={addEventListener(){}};const a=new AttendanceApp();a.render=()=>{};a.toast=()=>{};a.updateSaveState=()=>{};a.state.user={id:'teacher',role:'advisor'};a.queue=new DraftQueue(storage(),'teacher');a.state.attendance={date:'2026-10-01',classroomId:'c1',loadedKey:'2026-10-01:c1',revision:3,students:[{id:'s1'},{id:'s2'}],records:[{studentId:'s1',status:'present',reason:''}],search:''};return a;}
+function app(){globalThis.document={addEventListener(){}};globalThis.window={addEventListener(){}};const a=new AttendanceApp();a.render=()=>{};a.beginActivity=()=>()=>{};a.toast=()=>{};a.updateSaveState=()=>{};a.state.user={id:'teacher',role:'advisor'};a.queue=new DraftQueue(storage(),'teacher');a.state.attendance={date:'2026-10-01',classroomId:'c1',loadedKey:'2026-10-01:c1',revision:3,students:[{id:'s1'},{id:'s2'}],records:[{studentId:'s1',status:'present',reason:''}],search:''};return a;}
 test('failed reload clears old date data and prevents a new-date save',async()=>{const a=app();a.state.attendance.date='2026-10-02';a.api={call:async()=>{throw new Error('offline');}};await assert.rejects(a.loadAttendance());assert.deepEqual(a.state.attendance.records,[]);assert.equal(a.state.attendance.loadedKey,'');assert.throws(()=>a.enqueue('saveAttendance',[{studentId:'s1',status:'present'}]),/ยังโหลดข้อมูล/);});
 test('an older room response cannot replace the currently chosen classroom',async()=>{const a=app();let finish;a.api={call:()=>new Promise(resolve=>finish=resolve)};const pending=a.loadAttendance();a.state.attendance.classroomId='c2';a.state.attendance.loadedKey='2026-10-01:c2';a.state.attendance.records=[{studentId:'s9',status:'late'}];finish({students:[{studentId:'s1'}],records:[{studentId:'s1',status:'absent'}],revision:7});await pending;assert.equal(a.state.attendance.records[0].studentId,'s9');assert.equal(a.state.attendance.loadedKey,'2026-10-01:c2');});
 test('typing a reason then quickly marking another student retains the reason',async()=>{const a=app();a.sync=async()=>{};a.input({target:{dataset:{reasonId:'s1'},value:'ลาป่วย'}});await a.mark('s2','late');assert.equal(a.state.attendance.records.find(r=>r.studentId==='s1').reason,'ลาป่วย');assert.equal(a.queue.items[0].payload.records[0].reason,'ลาป่วย');assert.equal(a.queue.items.length,2);assert.equal(a.reasonTimers.size,0);});
@@ -28,4 +28,30 @@ test('dashboard navigation crosses month/year boundaries and reuses public date 
   await a.stepDashboardDate(-1);assert.equal(calls.length,2);assert.ok(calls.every(c=>c.action==='publicDashboard'));assert.equal(a.state.route,'dashboard');
   a.state.loading=true;await a.stepDashboardDate(-1);assert.equal(a.state.filters.date,'2025-12-31');
   a.state.loading=false;await a.setDashboardDate('');await a.setDashboardDate('2026-02-30');assert.equal(calls.length,2);
+});
+
+function feedbackStub(a){
+  const calls={fire:[],update:[],closed:0,visible:false};
+  globalThis.Swal=window.Swal={fire(options){calls.fire.push(options);calls.visible=true;options.didOpen?.();return Promise.resolve({});},isVisible(){return calls.visible;},update(options){calls.update.push(options);},showLoading(){},close(){calls.closed++;calls.visible=false;}};
+  a.beginActivity=AttendanceApp.prototype.beginActivity.bind(a);a.toast=AttendanceApp.prototype.toast.bind(a);return calls;
+}
+test('parallel requests share one live popup until all finish; long waits update and timers stop',async t=>{
+  t.mock.timers.enable({apis:['setTimeout','setInterval','Date']});
+  const a=app(),feedback=feedbackStub(a);const finishes=[];a.api={call:()=>new Promise(resolve=>finishes.push(resolve))};
+  const one=a.request('listClassrooms'),two=a.request('listStudents');assert.equal(feedback.fire.length,1);assert.equal(a.activityCount,2);
+  t.mock.timers.tick(9000);assert.ok(feedback.update.at(-1).html.includes('ระบบยังทำงานอยู่'));assert.ok(feedback.update.at(-1).html.includes('9 วินาที'));
+  finishes[0]([]);await one;t.mock.timers.tick(1000);assert.equal(feedback.closed,0);
+  finishes[1]([]);await two;t.mock.timers.tick(150);assert.equal(feedback.closed,1);assert.equal(a.busyTimer,null);
+  const updates=feedback.update.length;t.mock.timers.tick(30000);assert.equal(feedback.update.length,updates);delete globalThis.Swal;
+});
+test('progress stays open until success and pending cleanup cannot close a form or error',async t=>{
+  t.mock.timers.enable({apis:['setTimeout','setInterval','Date']});
+  const a=app(),feedback=feedbackStub(a);a.toast('กำลังบันทึก…','info');t.mock.timers.tick(25000);
+  assert.equal(feedback.closed,0);assert.ok(feedback.update.at(-1).html.includes('อย่ากดบันทึกซ้ำ'));
+  a.api={call:async()=>({})};await a.request('saveAttendance');a.toast('บันทึกสำเร็จ','success');
+  assert.equal(feedback.fire.at(-1).icon,'success');assert.equal(a.busyTimer,null);t.mock.timers.tick(1000);assert.equal(feedback.closed,0);
+  a.toast('กำลังบันทึก…','info');a.toast('บันทึกสำเร็จ','success');assert.equal(feedback.fire.at(-1).icon,'success');assert.equal(a.busyTimer,null);
+  await a.request('listStudents');await a.modal({title:'กรอกข้อมูล'});t.mock.timers.tick(1000);assert.equal(feedback.closed,0);assert.equal(feedback.fire.at(-1).title,'กรอกข้อมูล');
+  a.api={call:async()=>{throw new Error('เครือข่ายขัดข้อง');}};await a.request('listStudents').catch(error=>a.error(error));
+  assert.equal(feedback.fire.at(-1).icon,'error');assert.equal(a.busyTimer,null);t.mock.timers.tick(1000);assert.equal(feedback.closed,0);delete globalThis.Swal;
 });

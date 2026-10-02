@@ -122,3 +122,6 @@
   .status-controls{gap:8px}.status-button{padding:10px 5px;font-size:16px;min-height:54px}
   .overview-banner{flex-wrap:wrap}.overview-rate{text-align:left}.dashboard-date-nav{gap:9px}
 }
+
+/* Continuous server activity feedback; motion indicates waiting, never a fake percentage. */
+.busy-feedback p{font-size:16px;line-height:1.7;color:#334155;margin:0 0 10px}.busy-elapsed{display:block;color:#475569;font-size:14px;font-variant-numeric:tabular-nums}.busy-progress{height:8px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin:16px auto 0;max-width:300px}.busy-progress>span{display:block;width:38%;height:100%;border-radius:inherit;background:var(--secondary);animation:busy-progress-slide 1.5s ease-in-out infinite alternate}@keyframes busy-progress-slide{from{transform:translateX(0)}to{transform:translateX(164%)}}@media(prefers-reduced-motion:reduce){.busy-progress>span{animation:none;width:100%}}
