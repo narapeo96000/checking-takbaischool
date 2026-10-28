@@ -58,3 +58,8 @@ test('admin personnel page offers password reset for active and inactive account
   const admin=Views.teachers({user:{role:'admin'},users});assert.equal((admin.match(/data-action="admin-reset-password"/g)||[]).length,2);assert.ok(admin.includes('ปิดใช้งาน'));
   assert.ok(!Views.teachers({user:{role:'advisor'},users}).includes('data-action="admin-reset-password"'));
 });
+
+test('login field accepts all identifier types using a text input and escapes remembered values',()=>{
+ const html=Views.login({user:null,settings:{},location:{},loginPrefs:{username:'<img onerror=alert(1)>'}});
+ assert.ok(html.includes('อีเมล / เลขบัตรประชาชน / username'));assert.ok(html.includes('name="username"'));assert.ok(html.includes('maxlength="254"'));assert.ok(!html.includes('<img onerror'));assert.ok(html.includes('&lt;img onerror'));
+});

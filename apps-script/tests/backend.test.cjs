@@ -221,13 +221,18 @@ test('last admin is retained, formula text is escaped, user API never includes p
   const auth=login('admin'),users=api.dispatch({action:'listUsers',token:auth.token,payload:{}}).data;assert.equal(JSON.stringify(users).includes(fixtureHash),false);assert.equal(JSON.stringify(users).includes(fixtureSalt),false);
 });
 
-test('legacy user schema gains password column without overwriting hashes or rows',()=>{
-  seed();const sheet=state.sheets.get('users');sheet.rows.forEach(row=>row.pop());
-  const before=sheet.rows.map(row=>row.slice());const repo=api.Database.repo('users');
-  assert.equal(sheet.rows[0][12],'password');assert.deepEqual(sheet.rows.slice(1).map(row=>row.slice(0,12)),before.slice(1));
-  assert.equal(api.PasswordCrypto.verify(fixturePassword,repo.find('userId','admin-1')),true);
-  api.Database.initialize();assert.equal(repo.all().length,3);
+test('legacy user schemas append identity/password columns without changing existing values',()=>{
+  for(const width of [12,13]){
+    reset();seed();const sheet=state.sheets.get('users');sheet.rows=sheet.rows.map(row=>row.slice(0,width));
+    if(width===13)sheet.rows[1][12]='01234567';
+    const before=sheet.rows.map(row=>row.slice());const repo=api.Database.repo('users');
+    assert.equal(sheet.rows[0][12],'password');assert.equal(sheet.rows[0][13],'nationalId');assert.deepEqual(sheet.rows.slice(1).map(row=>row.slice(0,width)),before.slice(1));
+    assert.equal(api.PasswordCrypto.verify(width===13?'01234567':fixturePassword,repo.find('userId','admin-1')),true);
+    api.Database.initialize();assert.equal(repo.all().length,3);
+  }
+  const sheet=state.sheets.get('users');sheet.rows[0][13]='unexpected-column';assert.throws(()=>api.Database.repo('users'),e=>e.code==='SCHEMA');assert.equal(sheet.rows[0][13],'unexpected-column');
 });
+
 test('password changes store readable eight-digit password, preserve zero, and revoke other sessions',()=>{
   seed();const first=login('admin'),second=login('admin');const actor=api.AuthService.authenticate(first.token,true);
   api.AuthService.changePassword(actor,{currentPassword:fixturePassword,newPassword:'01234567'},'change');
@@ -298,4 +303,38 @@ test('email reset requires exact registered pair; links expire at 15 minutes and
   api.PasswordResetService.reset({token,newPassword:'00001111'},'complete');assert.throws(()=>api.PasswordResetService.reset({token,newPassword:'22223333'},'reuse'),e=>e.code==='VALIDATION');assert.throws(()=>api.AuthService.authenticate(loginBefore.token,true),e=>e.code==='UNAUTHORIZED');assert.equal(api.AuthService.login({username:'teacher.a',password:'00001111'},'new-login').mustChangePassword,false);
   api.PasswordResetService.request({username:'teacher.a',email:'teacher@example.com'},'expired');const expiredToken=state.mail.body.match(/\n([a-f0-9]{64})\n/)[1];const expiring=api.Database.repo('password_resets').all().find(r=>!r.usedAt);expiring.expiresAt=new Date(Date.now()-1).toISOString();api.Database.repo('password_resets').update(expiring);
   assert.throws(()=>api.PasswordResetService.reset({token:expiredToken,newPassword:'44445555'},'late'),e=>e.code==='VALIDATION');assert.equal(api.Database.repo('users').find('userId',teacher.userId).password,'00001111');
+});
+
+function addIdentity(admin,userId='advisor-a',extra={}){
+  const user=api.Database.repo('users').find('userId',userId);
+  return api.AdminService.saveUser(admin,{userId,username:user.username,displayName:user.displayName,role:user.role,active:user.active,...extra},'identity-test');
+}
+test('username, registered email and national ID log into the same account with unchanged classroom rights',()=>{
+  const {admin}=seed();addIdentity(admin,'advisor-a',{email:'Teacher.A@Example.com',nationalId:'0-1234-56789-01-2'});
+  for(const identifier of ['teacher.a',' TEACHER.A ','Teacher.A@Example.COM','0123456789012','0-1234-56789-01-2']){
+    const result=api.dispatch({action:'login',payload:{username:identifier,password:fixturePassword}});assert.equal(result.ok,true,identifier);assert.equal(result.data.user.userId,'advisor-a');assert.deepEqual(plain(result.data.user.classroomIds),['A']);assert.ok(!JSON.stringify(result.data).includes('0123456789012'));
+  }
+  assert.equal(api.dispatch({action:'login',payload:{identifier:'teacher.a@example.com',password:fixturePassword}}).ok,true);
+  const before=api.Database.repo('users').find('userId','advisor-a');assert.equal(before.nationalId,'0123456789012');addIdentity(admin,'advisor-a',{displayName:'ชื่อแก้ไข'});assert.equal(api.Database.repo('users').find('userId','advisor-a').nationalId,'0123456789012');
+  api.dispatch({action:'login',payload:{username:'0123456789012',password:'wrong-password'}});assert.ok(!JSON.stringify(api.Database.repo('logs').all()).includes('0123456789012'));assert.ok(!JSON.stringify(api.PasswordResetService.request({username:'missing',email:'none@example.com'},'no-user')).includes('nationalId'));
+});
+test('duplicate email, national ID and cross-username aliases fail before any account data is written',()=>{
+  const {admin}=seed();addIdentity(admin,'advisor-a',{email:'teacher@example.com',nationalId:'0123456789012'});
+  for(const payload of [{username:'new.teacher',email:'TEACHER@example.com'},{nationalId:'0-1234-56789-01-2'},{username:'0123456789012'},{nationalId:'123'},{email:'invalid'}]){
+    const before=JSON.stringify(api.Database.repo('users').all()),emails=JSON.stringify(api.Database.repo('user_emails').all());assert.throws(()=>addIdentity(admin,'advisor-b',payload),e=>['CONFLICT','VALIDATION'].includes(e.code));assert.equal(JSON.stringify(api.Database.repo('users').all()),before);assert.equal(JSON.stringify(api.Database.repo('user_emails').all()),emails);
+  }
+  addIdentity(admin,'advisor-b',{username:'1111111111111'});assert.throws(()=>addIdentity(admin,'advisor-a',{nationalId:'1111111111111'}),e=>e.code==='CONFLICT');
+});
+test('ambiguous legacy identifiers never select an account by matching its password',()=>{
+  const {admin}=seed();const emails=api.Database.repo('user_emails');for(const userId of ['advisor-a','advisor-b'])emails.append({userId,email:'shared@example.com'});
+  assert.equal(api.dispatch({action:'login',payload:{username:'shared@example.com',password:fixturePassword}}).error.code,'LOGIN_FAILED');assert.equal(login('teacher.a').user.userId,'advisor-a');
+  const repo=api.Database.repo('users');for(const userId of ['advisor-a','advisor-b']){const user=repo.find('userId',userId);user.nationalId='0123456789012';repo.update(user);}
+  assert.equal(api.dispatch({action:'login',payload:{username:'0123456789012',password:fixturePassword}}).error.code,'LOGIN_FAILED');
+  const a=repo.find('userId','advisor-a');a.nationalId='';a.username='0123456789012';repo.update(a);assert.equal(api.dispatch({action:'login',payload:{username:'0123456789012',password:fixturePassword}}).error.code,'LOGIN_FAILED');
+});
+test('all login aliases respect disabled accounts and share failed-login throttling',()=>{
+  const {admin}=seed();addIdentity(admin,'advisor-a',{email:'teacher@example.com',nationalId:'0123456789012',active:false});
+  for(const username of ['teacher.a','teacher@example.com','0123456789012'])assert.equal(api.dispatch({action:'login',payload:{username,password:fixturePassword}}).error.code,'LOGIN_FAILED');
+  addIdentity(admin,'advisor-a',{active:true});state.cache.clear();const identifiers=['teacher.a','teacher@example.com','0123456789012'];for(let i=0;i<8;i++)assert.equal(api.dispatch({action:'login',payload:{username:identifiers[i%3],password:'incorrect'}}).error.code,'LOGIN_FAILED');
+  assert.equal(api.dispatch({action:'login',payload:{username:'teacher@example.com',password:fixturePassword}}).error.code,'RATE_LIMIT');
 });

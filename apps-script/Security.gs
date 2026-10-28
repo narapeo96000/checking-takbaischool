@@ -87,20 +87,36 @@ class Authorization {
   }
 }
 
+class UserIdentityService {
+  static nationalId(value) {
+    if (value == null || String(value).trim() === '') return '';
+    const normalized = String(value).trim().replace(/[\s-]/g,'');
+    if (!/^\d{13}$/.test(normalized)) throw new AppError('VALIDATION','เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก');
+    return normalized;
+  }
+  static resolve(identifier) {
+    const nationalId = /^[\d\s-]+$/.test(identifier) ? identifier.replace(/[\s-]/g,'') : '';
+    const emailUsers = identifier.includes('@') ? new Set(Database.repo('user_emails').all().filter(row => String(row.email).trim().toLowerCase() === identifier).map(row => row.userId)) : new Set();
+    const users = Database.repo('users').all().filter(user => String(user.username).trim().toLowerCase() === identifier || emailUsers.has(user.userId) || (nationalId.length === 13 && String(user.nationalId || '') === nationalId));
+    // Never choose a different account based on which password happens to match.
+    return users.length === 1 ? users[0] : null;
+  }
+}
+
 class AuthService {
   static login(payload, requestId) {
-    const username = Validation.required(payload.username, 'ชื่อผู้ใช้', 100).toLowerCase();
+    const identifier = Validation.required(payload.identifier == null ? payload.username : payload.identifier, 'อีเมล เลขบัตรประชาชน หรือ username', 254).toLowerCase();
     const password = String(payload.password || '');
-    if (password.length > 128) throw new AppError('LOGIN_FAILED', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+    if (password.length > 128) throw new AppError('LOGIN_FAILED', 'ข้อมูลผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     return withLock_(() => {
-      const cache = CacheService.getScriptCache(), key = 'login:' + PasswordCrypto.hash(username), globalKey = 'login:global';
+      const user = UserIdentityService.resolve(identifier);
+      const cache = CacheService.getScriptCache(), key = 'login:' + PasswordCrypto.hash(user ? 'user:' + user.userId : 'input:' + identifier), globalKey = 'login:global';
       const failures = Number(cache.get(key) || 0), globalFailures = Number(cache.get(globalKey) || 0);
       if (failures >= 8 || globalFailures >= 80) throw new AppError('RATE_LIMIT', 'ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ 15 นาที');
-      const user = Database.repo('users').all().find(item => String(item.username).toLowerCase() === username);
       if (!user || !Validation.bool(user.active) || !PasswordCrypto.verify(password, user)) {
         cache.put(key, String(failures + 1), 900); cache.put(globalKey, String(globalFailures + 1), 900);
-        AuditLog.write(null, 'login_failed', username, null, { username }, null, requestId);
-        throw new AppError('LOGIN_FAILED', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        AuditLog.write(null, 'login_failed', user ? user.userId : 'unrecognized', null, { identifierType:identifier.includes('@') ? 'email' : /^[\d\s-]{13,}$/.test(identifier) ? 'nationalId' : 'username' }, null, requestId);
+        throw new AppError('LOGIN_FAILED', 'ข้อมูลผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
       }
       cache.remove(key);
       const token = uuid_().replace(/-/g, '') + uuid_().replace(/-/g, '');
@@ -145,9 +161,14 @@ class UserEmailService {
     const row = Database.repo('user_emails').find('userId', userId);
     return row ? String(row.email || '') : '';
   }
-  static save(userId, email, updatedBy) {
+  static validate(userId, email) {
     const value = String(email || '').trim().toLowerCase();
     if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) throw new AppError('VALIDATION', 'อีเมลไม่ถูกต้อง');
+    if (value && Database.repo('user_emails').all().some(row => row.userId !== userId && String(row.email).trim().toLowerCase() === value)) throw new AppError('CONFLICT','อีเมลนี้ใช้กับบัญชีอื่นแล้ว');
+    return value;
+  }
+  static save(userId, email, updatedBy) {
+    const value = this.validate(userId,email);
     const repo = Database.repo('user_emails'), existing = repo.find('userId', userId);
     if (!value) { if (existing) repo.removeRows([existing._row]); return; }
     repo.upsert('userId', { userId, email:value, updatedAt:nowIso_(), updatedBy:String(updatedBy || 'system') });

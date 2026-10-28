@@ -85,7 +85,7 @@ class AdminService {
   }
   static users(actor) {
     Authorization.admin(actor);
-    return Database.repo('users').all().map(user => { const result = Authorization.user(user); result.email = UserEmailService.get(user.userId); result.createdAt = user.createdAt; return result; });
+    return Database.repo('users').all().map(user => { const result = Authorization.user(user); result.email = UserEmailService.get(user.userId); result.nationalId = String(user.nationalId || ''); result.createdAt = user.createdAt; return result; });
   }
   static saveUser(actor, payload, requestId) {
     Authorization.admin(actor);
@@ -95,17 +95,21 @@ class AdminService {
       const username = Validation.required(payload.username, 'ชื่อผู้ใช้', 100).toLowerCase();
       if (!/^[a-z0-9_.-]{3,100}$/.test(username)) throw new AppError('VALIDATION', 'ชื่อผู้ใช้ใช้ภาษาอังกฤษ ตัวเลข _ . - อย่างน้อย 3 ตัว');
       if (repo.all().some(user => String(user.username).toLowerCase() === username && (!previous || user.userId !== previous.userId))) throw new AppError('CONFLICT', 'มีชื่อผู้ใช้นี้แล้ว');
+      const nationalId = Object.prototype.hasOwnProperty.call(payload,'nationalId') ? UserIdentityService.nationalId(payload.nationalId) : String(previous && previous.nationalId || '');
+      const others = repo.all().filter(user => !previous || user.userId !== previous.userId);
+      if (others.some(user => String(user.nationalId || '') === username || (nationalId && (String(user.nationalId || '') === nationalId || String(user.username).toLowerCase() === nationalId)))) throw new AppError('CONFLICT','เลขบัตรประชาชนหรือ username นี้ใช้กับบัญชีอื่นแล้ว');
+      if (Object.prototype.hasOwnProperty.call(payload,'email')) UserEmailService.validate(previous ? previous.userId : '',payload.email);
       const role = payload.role || (previous && previous.role) || 'advisor';
       if (!['admin','advisor'].includes(role)) throw new AppError('VALIDATION', 'ประเภทผู้ใช้ไม่ถูกต้อง');
       const classrooms = payload.classroomIds == null ? (previous ? JSON.parse(previous.classroomIds || '[]') : []) : payload.classroomIds;
       if (!Array.isArray(classrooms) || classrooms.some(id => !Database.repo('classrooms').find('classroomId', id))) throw new AppError('VALIDATION', 'รายชื่อห้องเรียนไม่ถูกต้อง');
-      const user = Object.assign({}, previous || {}, { userId: previous ? previous.userId : uuid_(), username, displayName: Validation.required(payload.displayName, 'ชื่อผู้ใช้ที่แสดง', 250), role, classroomIds: JSON.stringify([...new Set(classrooms)]), active: Validation.bool(payload.active, previous ? Validation.bool(previous.active) : true), createdAt: previous ? previous.createdAt : nowIso_(), updatedAt: nowIso_() });
+      const user = Object.assign({}, previous || {}, { userId: previous ? previous.userId : uuid_(), username, nationalId, displayName: Validation.required(payload.displayName, 'ชื่อผู้ใช้ที่แสดง', 250), role, classroomIds: JSON.stringify([...new Set(classrooms)]), active: Validation.bool(payload.active, previous ? Validation.bool(previous.active) : true), createdAt: previous ? previous.createdAt : nowIso_(), updatedAt: nowIso_() });
       if (!previous || payload.password) Object.assign(user, PasswordCrypto.credentials(payload.password), { mustChangePassword: true });
       if (previous && previous.role === 'admin' && Validation.bool(previous.active) && (user.role !== 'admin' || !user.active) && repo.all().filter(item => item.role === 'admin' && Validation.bool(item.active)).length <= 1) throw new AppError('VALIDATION', 'ต้องมีผู้ดูแลระบบที่เปิดใช้งานอย่างน้อยหนึ่งคน');
       if (previous) { repo.update(user); AuthService.revokeSessions(user.userId); } else repo.append(user);
       if (Object.prototype.hasOwnProperty.call(payload, 'email')) UserEmailService.save(user.userId, payload.email, actor.userId);
       AuditLog.write(actor, 'save_user', user.userId, previous ? Authorization.user(previous) : null, Authorization.user(user), null, requestId);
-      const result = Authorization.user(user); result.email = UserEmailService.get(user.userId); return result;
+      const result = Authorization.user(user); result.email = UserEmailService.get(user.userId); result.nationalId = nationalId; return result;
     });
   }
   static resetUserPassword(actor, payload, requestId) {

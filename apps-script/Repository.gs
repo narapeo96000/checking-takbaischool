@@ -10,12 +10,13 @@ class SheetRepository {
   assertSchema() {
     if (this.name === 'users' && this.sheet.getMaxColumns() < this.columns.length) this.sheet.insertColumnsAfter(this.sheet.getMaxColumns(), this.columns.length - this.sheet.getMaxColumns());
     const actual = this.sheet.getRange(1, 1, 1, this.columns.length).getValues()[0];
-    // Append only the new password column; preserve every legacy user field and row.
-    if (this.name === 'users' && actual[actual.length - 1] === '' && this.columns.slice(0, -1).every((column, i) => actual[i] === column)) {
-      if (this.sheet.getMaxColumns() < this.columns.length) this.sheet.insertColumnsAfter(this.sheet.getMaxColumns(), this.columns.length - this.sheet.getMaxColumns());
-      this.sheet.getRange(1, this.columns.length, 1, 1).setValues([['password']]);
-      this.sheet.getRange(2, this.columns.length, this.sheet.getMaxRows() - 1, 1).setNumberFormat('@');
-      actual[actual.length - 1] = 'password';
+    // Append supported identity/password columns without changing any legacy cells.
+    const missing = actual.findIndex(value => value === '');
+    if (this.name === 'users' && [12,13].includes(missing) && actual.slice(missing).every(value => value === '') && this.columns.slice(0,missing).every((column,i) => actual[i] === column)) {
+      const added = this.columns.slice(missing);
+      this.sheet.getRange(1, missing + 1, 1, added.length).setValues([added]);
+      this.sheet.getRange(2, missing + 1, Math.max(1,this.sheet.getMaxRows() - 1), added.length).setNumberFormat('@');
+      added.forEach((column,i) => { actual[missing+i] = column; });
     }
     if (this.columns.some((column, i) => actual[i] !== column)) throw new AppError('SCHEMA', 'หัวตารางชีต ' + this.name + ' ไม่ตรงกับระบบ กรุณาตรวจสอบก่อนใช้งาน');
   }

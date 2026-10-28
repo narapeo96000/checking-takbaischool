@@ -67,3 +67,8 @@ test('email reset retries mismatched confirmation then consumes token without re
   a.formModal=async()=>forms.shift();a.showStatusAlert=async()=>a.clearBusyFeedback();a.api={call:async(action,payload)=>{calls.push({action,payload});return {reset:true};}};a.navigate=async route=>{a.state.route=route;};globalThis.history={replaceState(){}};globalThis.location={pathname:'/'};
   await a.resetFromLink('a'.repeat(64));assert.deepEqual(calls,[{action:'resetPassword',payload:{token:'a'.repeat(64),newPassword:'01234567'}}]);assert.equal(a.state.route,'login');assert.equal(a.state.user,null);
 });
+
+test('a completed loading popup cannot hide confirmation on the next account form',async()=>{
+ const a=app();let loading=0,oldOpen;globalThis.Swal=window.Swal={isVisible:()=>true,fire(options){if(options.didOpen)oldOpen=options.didOpen;return Promise.resolve({});},update(){},showLoading(){loading++;},getPopup:()=>({})};
+ a.showBusyAlert('กำลังเรียกข้อมูล…');await a.modal({title:'บันทึกบัญชี'});oldOpen({});assert.equal(loading,0);assert.equal(a.busyTimer,null);delete globalThis.Swal;
+});
