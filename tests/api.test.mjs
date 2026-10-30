@@ -24,7 +24,9 @@ function browser(t) {
   install('document', {
     createElement(tag) {
       assert.equal(tag, 'iframe');
-      return { credentialless: false, contentWindow: source('outer Google iframe'), removed: false, isConnected: false,
+      return { credentialless: false, contentWindow: source('outer Google iframe'), removed: false, isConnected: false, style: {}, attributes: new Map(),
+        setAttribute(name, value) { this.attributes.set(name, value); },
+        getAttribute(name) { return this.attributes.get(name) ?? null; },
         remove() { this.removed = true; this.isConnected = false; } };
     },
     body: { append(frame) { frame.isConnected = true; frames.push(frame); } }
@@ -103,7 +105,9 @@ test('connection binds the Google inner sandbox rather than requiring the outer 
   assert.equal(url.origin, 'https://script.google.com');
   assert.equal(url.searchParams.get('hostOrigin'), HOST_ORIGIN);
   assert.equal(url.searchParams.get('channel'), api.channel);
-  assert.equal(frame.hidden, true);
+  assert.equal(frame.hidden, undefined);
+  assert.equal(frame.getAttribute('aria-hidden'), 'true');
+  assert.equal(frame.style.position, 'fixed');
   assert.equal(frame.credentialless, true);
   assert.equal(frame.referrerPolicy, 'no-referrer');
   assert.notEqual(inner, frame.contentWindow);

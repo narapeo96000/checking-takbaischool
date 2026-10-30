@@ -8,7 +8,12 @@ export class AppsScriptApi {
     this.channel=uuid();
     this.ready=new Promise((resolve,reject)=>{this.resolveReady=resolve;this.rejectReady=reject;this.readyTimer=setTimeout(()=>{this.frame?.remove();this.ready=null;this.resolveReady=null;this.channel=uuid();reject(new ApiError('เชื่อมต่อไม่ได้ ตรวจ URL /exec และสิทธิ์ Web App หากใช้ Google หลายบัญชีให้ลองเปิดเว็บในโหมดไม่ระบุตัวตน','CONNECTION'));},25000);});
     const u=new URL(this.url);u.searchParams.set('channel',this.channel);u.searchParams.set('hostOrigin',location.origin);
-    this.frame=document.createElement('iframe');this.frame.title='การเชื่อมต่อระบบเช็คชื่อ';this.frame.hidden=true;
+    this.frame=document.createElement('iframe');this.frame.title='การเชื่อมต่อระบบเช็คชื่อ';
+    // iOS Safari/LINE may suspend an iframe using display:none before Apps Script
+    // delivers its callback. Keep it attached and visually out of the way so the
+    // bridge remains schedulable while preserving the strict message checks below.
+    this.frame.setAttribute('aria-hidden','true');
+    Object.assign(this.frame.style,{position:'fixed',width:'1px',height:'1px',left:'-10px',top:'-10px',border:'0',opacity:'0',pointerEvents:'none'});
     // This public bridge uses app sessions, so Google multi-login cookies are unnecessary.
     if('credentialless' in this.frame)this.frame.credentialless=true;
     this.frame.referrerPolicy='no-referrer';this.frame.src=u.href;document.body.append(this.frame);return this.ready;

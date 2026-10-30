@@ -1,7 +1,7 @@
 import {Views,locationPreview} from './views.js?v=mobile-20261030';
 import {SafeStorage,touchNavigation,pickSpreadsheetFile,readFileBytes,downloadBlob,mountDownloadLink} from './browser.js?v=mobile-20261030';
 import {renderUserGuide,GuideSearch} from './manual.js?v=mobile-20261030';
-import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=password-reset-admin-20261002';
+import {AppsScriptApi,DemoApi,validateApiUrl} from './api.js?v=ios-bridge-20261030';
 import {escapeHtml as e,icon,today,STATUSES,DraftQueue,summarize,safeUrl} from './core.js';
 
 export class AttendanceApp {
