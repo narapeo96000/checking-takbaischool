@@ -10,7 +10,9 @@
   const channel = configuration.channel;
   const host = window.top;
   if (window === host) return;
-  const reply = (requestId, result) => host.postMessage({ type:'CHECKING_RESPONSE', channel, requestId, result },allowedOrigin);
+  // Google RPC can invoke handlers from a sibling context in WebKit. Schedule
+  // the reply in this window so the host's strict source binding remains valid.
+  const reply = (requestId, result) => window.setTimeout(() => host.postMessage({ type:'CHECKING_RESPONSE', channel, requestId, result },allowedOrigin),0);
   window.addEventListener('message', event => {
     const message = event.data;
     if (event.source !== host || event.origin !== allowedOrigin || !message || message.type !== 'CHECKING_REQUEST' || message.channel !== channel || typeof message.requestId !== 'string' || message.requestId.length > 100) return;
