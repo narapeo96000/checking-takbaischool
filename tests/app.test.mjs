@@ -72,3 +72,28 @@ test('a completed loading popup cannot hide confirmation on the next account for
  const a=app();let loading=0,oldOpen;globalThis.Swal=window.Swal={isVisible:()=>true,fire(options){if(options.didOpen)oldOpen=options.didOpen;return Promise.resolve({});},update(){},showLoading(){loading++;},getPopup:()=>({})};
  a.showBusyAlert('กำลังเรียกข้อมูล…');await a.modal({title:'บันทึกบัญชี'});oldOpen({});assert.equal(loading,0);assert.equal(a.busyTimer,null);delete globalThis.Swal;
 });
+
+test('restricted mobile storage does not prevent opening the application',()=>{
+ const descriptor=Object.getOwnPropertyDescriptor(globalThis,'localStorage');
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,get(){throw new Error('Storage access denied');}});
+ try{assert.doesNotThrow(()=>app());}finally{if(descriptor)Object.defineProperty(globalThis,'localStorage',descriptor);else delete globalThis.localStorage;}
+});
+test('a late location result preserves the current form instead of rebuilding it',async()=>{
+ const descriptor=Object.getOwnPropertyDescriptor(globalThis,'navigator');let resolvePosition;const a=app();let renders=0;a.render=()=>{renders++;};a.state.demo=false;a.state.location={status:'idle'};document.getElementById=()=>null;document.querySelector=()=>null;
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{geolocation:{getCurrentPosition(resolve){resolvePosition=resolve;}}}});
+ try{const pending=a.captureLocation(false);resolvePosition({coords:{latitude:6,longitude:102,accuracy:12},timestamp:Date.now()});await pending;assert.equal(a.state.location.status,'ready');assert.equal(renders,0);}finally{if(descriptor)Object.defineProperty(globalThis,'navigator',descriptor);else delete globalThis.navigator;}
+});
+
+test('successful roster writes refresh cached student results without reloading unrelated classrooms',async()=>{
+ const a=app();let names=['เดิม'],roomCalls=0;a.api={call:async(action)=>{if(action==='listStudents')return names.map((name,i)=>({studentId:String(i),firstName:name}));if(action==='listClassrooms'){roomCalls++;return [];}if(action==='importStudents'){names.push('นำเข้าใหม่');return {imported:1};}return {};}};
+ await a.cachedCall('listClassrooms',{},30000);assert.equal((await a.cachedCall('listStudents',{},30000)).length,1);await a.call('importStudents',{rows:[]});assert.equal((await a.cachedCall('listStudents',{},30000)).length,2);await a.cachedCall('listClassrooms',{},30000);assert.equal(roomCalls,1);
+});
+
+test('PDF waits for a real download tap and retains its blob URL until the dialog closes',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const a=app();window.Swal={};a.state.demo=false;a.api={call:async()=>({base64:Buffer.from('%PDF-1.4 test').toString('base64'),filename:'<unsafe>.pdf'})};let dialog,close;const revoked=[];const original=URL.revokeObjectURL;URL.revokeObjectURL=url=>{revoked.push(url);original(url);};
+ try{a.modal=options=>{dialog=options;return new Promise(resolve=>{close=resolve;});};const pending=a.exportPdf();for(let i=0;i<10&&!dialog;i++)await Promise.resolve();assert.ok(dialog.html.includes('class="button button-primary pdf-download"'));assert.ok(dialog.html.includes('download="&lt;unsafe&gt;.pdf"'));assert.ok(!dialog.html.includes('<unsafe>'));t.mock.timers.tick(120000);assert.equal(revoked.length,0);close({});await pending;t.mock.timers.tick(59999);assert.equal(revoked.length,0);t.mock.timers.tick(1);assert.equal(revoked.length,1);}finally{URL.revokeObjectURL=original;}
+});
+
+test('PDF remains downloadable through an actual page link when SweetAlert is unavailable',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const a=app();const panels=[];document.getElementById=()=>({prepend(node){panels.push(node);}});document.createElement=tag=>({tag,children:[],style:{},append(...nodes){this.children.push(...nodes);},setAttribute(){},addEventListener(){},remove(){},focus(){},scrollIntoView(){}});window.confirm=()=>false;a.modal=AttendanceApp.prototype.modal.bind(a);a.state.demo=false;a.api={call:async()=>({base64:Buffer.from('%PDF-1.4 test').toString('base64'),filename:'test.pdf'})};await a.exportPdf();assert.equal(panels.length,1);assert.ok(panels[0].children.some(node=>node.tag==='a'&&node.download==='test.pdf'));a.closePdfFallback?.();
+});
